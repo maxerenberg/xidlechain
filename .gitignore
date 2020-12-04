@@ -1,0 +1,5 @@
+*.o
+xidlechain
+xidlechain.1
+.vscode/
+tests/*_test
