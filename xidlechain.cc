@@ -76,18 +76,6 @@ static int parse_idlehint(int argc, char **argv, Xidlechain::EventManager &manag
     return 2;
 }
 
-static bool ignore_sigchld() {
-    struct sigaction act;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
-    act.sa_handler = SIG_IGN;
-    if (sigaction(SIGCHLD, &act, NULL) != 0) {
-        perror("sigaction");
-        return false;
-    }
-    return true;
-}
-
 int main(int argc, char *argv[]) {
     int ch;
     bool should_wait = false;
@@ -146,11 +134,6 @@ int main(int argc, char *argv[]) {
             g_critical("Unsupported command '%s'", argv[i]);
             return 1;
         }
-    }
-
-    // prevent child processes from turning into zombies
-    if (!ignore_sigchld()) {
-        return 1;
     }
 
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);

@@ -30,6 +30,9 @@ namespace Xidlechain {
         if (session_proxy) {
             g_object_unref(session_proxy);
         }
+        if (sleep_lock_fd) {
+            close(sleep_lock_fd);
+        }
     }
 
     char *LogindManager::get_session_id() {

@@ -16,35 +16,6 @@ namespace Xidlechain {
 
     Command::~Command() {}
 
-    void Command::activate(bool wait) {
-        if (activated) return;
-        exec_cmd(before_cmd, wait);
-        activated = true;
-    }
-
-    void Command::deactivate(bool wait) {
-        if (!activated) return;
-        exec_cmd(after_cmd, wait);
-        activated = false;
-    }
-
-    void Command::exec_cmd(char *cmd, bool wait) {
-        if (!cmd) return;
-        pid_t pid = fork();
-        if (pid == 0) {  // child
-            char *const argv[]{ "sh", "-c", cmd, NULL };
-            execvp(argv[0], argv);
-            g_critical("execvp failed");
-            exit(1);
-        } else if (pid < 0) {
-            g_critical("fork failed");
-            return;
-        }
-        if (wait) {
-            waitpid(pid, NULL, 0);
-        }
-    }
-
     // Use a negative value to differentiate it from the other
     // messages we send, which are array indices.
     const int64_t EventManager::idlehint_sentinel = -1;
@@ -89,6 +60,27 @@ namespace Xidlechain {
         should_wait = wait;
     }
 
+    void EventManager::exec_cmd(char *cmd) {
+        if (!cmd) return;
+        gchar *argv[] = {"sh", "-c", cmd, NULL};
+        GSpawnFlags flags = G_SPAWN_SEARCH_PATH;
+        GError *err = NULL;
+        gboolean success;
+
+        if (should_wait) {
+            success = g_spawn_sync(
+                NULL, argv, NULL, flags, NULL, NULL, NULL, NULL,
+                NULL, &err);
+        } else {
+            success = g_spawn_async(
+                NULL, argv, NULL, flags, NULL, NULL, NULL, &err);
+        }
+        if (!success) {
+            g_critical("%s", err->message);
+            g_error_free(err);
+        }
+    }
+
     void EventManager::enable_idle_hint(int64_t timeout_ms) {
         if (idlehint_enabled) {
             g_warning("Idle hint timeout can only be set once");
@@ -104,11 +96,15 @@ namespace Xidlechain {
     }
 
     void EventManager::activate(Command &cmd) {
-        cmd.activate(should_wait);
+        if (cmd.activated) return;
+        exec_cmd(cmd.before_cmd);
+        cmd.activated = true;
     }
 
     void EventManager::deactivate(Command &cmd) {
-        cmd.deactivate(should_wait);
+        if (!cmd.activated) return;
+        exec_cmd(cmd.after_cmd);
+        cmd.activated = false;
     }
 
     void EventManager::set_idle_hint(bool idle) {

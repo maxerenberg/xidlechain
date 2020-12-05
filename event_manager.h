@@ -10,18 +10,13 @@
 using std::vector;
 
 namespace Xidlechain {
-    class Command {
-    protected:
+    struct Command {
         bool activated;
-        void exec_cmd(char *cmd, bool wait);
-    public:
         char *before_cmd,
              *after_cmd;
         Command();
         Command(char *before_cmd, char *after_cmd);
         ~Command();
-        void activate(bool wait);
-        void deactivate(bool wait);
     };
 
     class EventManager: public EventReceiver {
@@ -38,6 +33,7 @@ namespace Xidlechain {
 
         void activate(Command &cmd);
         void deactivate(Command &cmd);
+        void exec_cmd(char *cmd);
         void set_idle_hint(bool idle);
     public:
         EventManager();
