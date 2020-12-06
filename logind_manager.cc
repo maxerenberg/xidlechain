@@ -9,8 +9,6 @@
 using std::runtime_error;
 
 namespace Xidlechain {
-    const char *APP_NAME = "xidlechain";
-
     const char * const LogindManager::BUS_NAME = "org.freedesktop.login1",
                * const LogindManager::MANAGER_OBJECT_PATH = "/org/freedesktop/login1",
                * const LogindManager::MANAGER_INTERFACE_NAME = "org.freedesktop.login1.Manager",

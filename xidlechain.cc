@@ -1,5 +1,6 @@
 #include <csignal>
 #include <cstdlib>
+#include <getopt.h>
 #include <sstream>
 #include <gdk/gdk.h>
 #include "event_manager.h"
@@ -78,14 +79,22 @@ static int parse_idlehint(int argc, char **argv, Xidlechain::EventManager &manag
 
 int main(int argc, char *argv[]) {
     int ch;
+    int ignore_audio = 0;
     bool should_wait = false;
+    static struct option long_options[] = {
+        {"ignore-audio", no_argument, &ignore_audio, 1},
+        {0,0,0,0}
+    };
+    int option_index = 0;
     Xidlechain::EventManager event_manager;
 
-    gdk_init(&argc, &argv);
-
     try {
-        while ((ch = getopt(argc, argv, "hdw")) != -1) {
+        for (;;) {
+            ch = getopt_long(argc, argv, "hdw", long_options, &option_index);
+            if (ch == -1) break;
             switch (ch) {
+                case 0:
+                    break;
                 case 'd':
                     putenv("G_MESSAGES_DEBUG=all");
                     break;
@@ -107,10 +116,10 @@ int main(int argc, char *argv[]) {
         return ch == 'h' ? 0 : 1;
     }
 
-    if (!event_manager.init()) {
+    gdk_init(&argc, &argv);
+    if (!event_manager.init(should_wait, ignore_audio)) {
         return 1;
     }
-    event_manager.set_should_wait(should_wait);
 
     int i = optind;
     while (i < argc) {

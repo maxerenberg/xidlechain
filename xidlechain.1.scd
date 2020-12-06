@@ -22,6 +22,9 @@ xidlechain - Idle manager for X
 
 	Note: using this option causes xidlechain to block until the command finishes.
 
+*--ignore-audio*
+	Ignore audio events. By default, timeouts are disabled while audio is playing.
+
 # DESCRIPTION
 
 xidlechain listens for idle activity on your X session and executes tasks
@@ -85,8 +88,7 @@ inhibition lock, the *-w* options is used in xidlechain (i3lock forks by default
 # AUTHORS
 
 Maintained by Max Erenberg.
-This page was adapted from the man page for *swayidle*(1), which is
-maintained by Drew DeVault.
+This page was adapted from the man page for *swayidle*(1).
 
 For more information about xidlechain development, see
 https://github.com/maxerenberg/xidlechain.

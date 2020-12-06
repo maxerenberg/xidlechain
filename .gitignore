@@ -1,4 +1,5 @@
 *.o
+*.d
 xidlechain
 xidlechain.1
 .vscode/

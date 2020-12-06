@@ -15,12 +15,13 @@ Install dependencies:
 
 * gtk2.0
 * Xext (X11 extensions)
+* pulseaudio
 * [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional: man pages)
 * g++ >= 8.3.0
 
 On Debian, these can be installed with the following command:
 
-    apt install libgtk2.0-dev libxext-dev scdoc g++
+    apt install libgtk2.0-dev libxext-dev libpulse-dev scdoc g++
 
 Run these commands:
 

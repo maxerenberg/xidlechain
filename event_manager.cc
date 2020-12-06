@@ -7,11 +7,13 @@ using namespace std;
 
 namespace Xidlechain {
     Command::Command():
-         activated(false), before_cmd(NULL), after_cmd(NULL)
+         activated(false), before_cmd(NULL), after_cmd(NULL),
+         timeout_ms(0)
     {}
 
-    Command::Command(char *before_cmd, char *after_cmd):
-         activated(false), before_cmd(before_cmd), after_cmd(after_cmd)
+    Command::Command(char *before_cmd, char *after_cmd, int64_t timeout_ms):
+         activated(false), before_cmd(before_cmd), after_cmd(after_cmd),
+         timeout_ms(timeout_ms)
     {}
 
     Command::~Command() {}
@@ -21,23 +23,26 @@ namespace Xidlechain {
     const int64_t EventManager::idlehint_sentinel = -1;
 
     EventManager::EventManager():
-        idlehint_enabled(false), should_wait(false)
+        idlehint_enabled(false), should_wait(false), audio_playing(false)
     {}
 
-    bool EventManager::init() {
+    bool EventManager::init(bool wait_on_children, bool ignore_audio) {
+        should_wait = wait_on_children;
         return activity_manager.init(this)
-            && logind_manager.init(this);
+            && logind_manager.init(this)
+            && (ignore_audio ? true : audio_manager.init(this));
     }
 
     void EventManager::add_timeout_command(char *before_cmd, char *after_cmd,
                                            int64_t timeout_ms)
     {
+        g_return_if_fail(timeout_ms > 1000);
         int64_t i = activity_commands.size();
-        activity_commands.emplace_back(Command{before_cmd, after_cmd});
+        activity_commands.emplace_back(
+            Command{before_cmd, after_cmd, timeout_ms});
         // Send the index of the command so that we know later which
         // command to activate
-        activity_manager.add_idle_timeout(
-            timeout_ms, (gpointer)i);
+        activity_manager.add_idle_timeout(timeout_ms, (gpointer)i);
     }
 
     void EventManager::set_sleep_cmd(char *cmd) {
@@ -54,10 +59,6 @@ namespace Xidlechain {
 
     void EventManager::set_unlock_cmd(char *cmd) {
         lock_cmd.after_cmd = cmd;
-    }
-
-    void EventManager::set_should_wait(bool wait) {
-        should_wait = wait;
     }
 
     void EventManager::exec_cmd(char *cmd) {
@@ -142,6 +143,27 @@ namespace Xidlechain {
             case EVENT_UNLOCK:
                 deactivate(lock_cmd);
                 set_idle_hint(false);
+                break;
+            case EVENT_AUDIO_RUNNING:
+                if (audio_playing) {  // no change
+                    break;
+                }
+                g_info("Audio running, disabling timeouts");
+                audio_playing = true;
+                activity_manager.clear_timeouts();
+                break;
+            case EVENT_AUDIO_STOPPED:
+                if (!audio_playing) {  // no change
+                    break;
+                }
+                g_info("Audio stopped, re-enabling timeouts");
+                audio_playing = false;
+                // re-register all of our timeouts
+                for (i = 0; i < (int64_t)activity_commands.size(); i++) {
+                    activity_manager.add_idle_timeout(
+                        activity_commands[i].timeout_ms,
+                        (gpointer)i);
+                }
                 break;
         }
     }
