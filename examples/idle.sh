@@ -1,9 +1,7 @@
 #!/bin/sh
 
-# Exit if there is already a running instance
-if pgrep -U $(id -u) xidlechain >/dev/null; then
-    exit
-fi
+# Kill other running instances
+pkill -U $(id -u) xidlechain
 
 # Disable the Screensaver and DPMS extensions
 xset s off
@@ -18,10 +16,10 @@ CUR_BRIGHTNESS=$(backlight-dbus | awk '{print $1}')
 # lock on suspend and on receiving the Lock signal.
 # The brightness will be reset to its original value after
 # user activity is detected or the system is woken from sleep.
-exec xidlechain -w \
+xidlechain -w \
     timeout 1200 "backlight-dbus 5%" \
         resume "backlight-dbus $CUR_BRIGHTNESS" \
     timeout 1260 "systemctl suspend" \
     before-sleep "locker.sh" \
     after-resume "backlight-dbus $CUR_BRIGHTNESS" \
-    lock "locker.sh"
+    lock "locker.sh" &
