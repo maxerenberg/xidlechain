@@ -23,7 +23,11 @@ On Debian, these can be installed with the following command:
 
     apt install libgtk2.0-dev libxext-dev libpulse-dev scdoc g++
 
-Run these commands:
+On Fedora:
+
+    dnf install gtk2-devel libXext-devel pulseaudio-libs-devel scdoc g++
+
+Once the dependencies have been installed, run the following:
 
     make
     make install
@@ -38,7 +42,7 @@ for X. I found it difficult to use these programs for real-life workflows:
   means you cannot run a different program for each signal, e.g. we might want
   to gradually dim the screen after inactivity, but not right before we suspend.
 * xautolock does not listen to the suspend signal at all, so it is impossible
-  to lock the screen right before the systemd suspends.
+  to lock the screen right before the system suspends.
 
 xidlechain uses timeouts and systemd signals to run programs in a carefully
 defined order. Unlike xss-lock and xautolock, which both use the X11 Screensaver
