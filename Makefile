@@ -1,8 +1,9 @@
 CXX = g++
+EXT_DEPS = gdk-2.0 gio-unix-2.0 xext libpulse libpulse-mainloop-glib
+# don't include all the GLib headers inside the .d files
 CXXFLAGS = -Wall -MMD -std=c++17 -Wno-write-strings -iquote ./ \
-	$(shell pkg-config --cflags gdk-2.0 gio-unix-2.0)
-LDLIBS = $(shell pkg-config --libs gdk-2.0 gio-unix-2.0 xext) \
-	-lpulse -lpulse-mainloop-glib
+	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
+LDLIBS = $(shell pkg-config --libs $(EXT_DEPS))
 DETECTOR_OBJECTS = activity_manager.o logind_manager.o audio_manager.o
 OBJECTS = xidlechain.o event_manager.o ${DETECTOR_OBJECTS}
 TEST_OBJECTS = tests/activity_manager_test.o tests/logind_manager_test.o \

@@ -131,17 +131,17 @@ namespace Xidlechain {
                 set_idle_hint(false);
                 break;
             case EVENT_SLEEP:
-                activate(sleep_cmd);
+                exec_cmd(sleep_cmd.before_cmd);
                 break;
             case EVENT_WAKE:
-                deactivate(sleep_cmd);
+                exec_cmd(sleep_cmd.after_cmd);
                 set_idle_hint(false);
                 break;
             case EVENT_LOCK:
-                activate(lock_cmd);
+                exec_cmd(lock_cmd.before_cmd);
                 break;
             case EVENT_UNLOCK:
-                deactivate(lock_cmd);
+                exec_cmd(lock_cmd.after_cmd);
                 set_idle_hint(false);
                 break;
             case EVENT_AUDIO_RUNNING:
