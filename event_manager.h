@@ -1,6 +1,7 @@
 #ifndef _EVENT_MANAGER_H_
 #define _EVENT_MANAGER_H_
 
+#include <unordered_set>
 #include <vector>
 #include <glib.h>
 #include "activity_manager.h"
@@ -8,6 +9,7 @@
 #include "event_receiver.h"
 #include "logind_manager.h"
 
+using std::unordered_set;
 using std::vector;
 
 namespace Xidlechain {
@@ -26,22 +28,27 @@ namespace Xidlechain {
         LogindManager logind_manager;
         AudioManager audio_manager;
         vector<Command> activity_commands;
+        unordered_set<GPid> children;
         Command sleep_cmd,
                 lock_cmd;
         bool idlehint_enabled;
-        bool should_wait;
-        bool audio_playing;
+        bool wait_before_sleep,
+             kill_on_resume,
+             audio_playing;
         // Sentinel value to determine which timer went off (i.e. one of
         // the activity timers or the idle hint timer).
         static const int64_t idlehint_sentinel;
 
         void activate(Command &cmd);
         void deactivate(Command &cmd);
-        void exec_cmd(char *cmd);
+        void exec_cmd(char *cmd, bool wait);
         void set_idle_hint(bool idle);
+        void kill_children();
+        static void child_watch_cb(GPid pid, gint status, gpointer data);
     public:
         EventManager();
-        bool init(bool wait_on_children, bool ignore_audio);
+        bool init(bool wait_before_sleep, bool kill_on_resume,
+                  bool ignore_audio);
         void add_timeout_command(char *before_cmd, char *after_cmd,
                                  int64_t timeout_ms);
         void set_sleep_cmd(char *cmd);

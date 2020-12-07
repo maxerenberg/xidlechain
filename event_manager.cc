@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include "event_manager.h"
 
-using namespace std;
-
 namespace Xidlechain {
     Command::Command():
          activated(false), before_cmd(NULL), after_cmd(NULL),
@@ -23,11 +21,15 @@ namespace Xidlechain {
     const int64_t EventManager::idlehint_sentinel = -1;
 
     EventManager::EventManager():
-        idlehint_enabled(false), should_wait(false), audio_playing(false)
+        idlehint_enabled(false), wait_before_sleep(true),
+        kill_on_resume(true), audio_playing(false)
     {}
 
-    bool EventManager::init(bool wait_on_children, bool ignore_audio) {
-        should_wait = wait_on_children;
+    bool EventManager::init(bool wait_before_sleep, bool kill_on_resume,
+                            bool ignore_audio)
+    {
+        this->wait_before_sleep = wait_before_sleep;
+        this->kill_on_resume = kill_on_resume;
         return activity_manager.init(this)
             && logind_manager.init(this)
             && (ignore_audio ? true : audio_manager.init(this));
@@ -61,25 +63,50 @@ namespace Xidlechain {
         lock_cmd.after_cmd = cmd;
     }
 
-    void EventManager::exec_cmd(char *cmd) {
+    void EventManager::exec_cmd(char *cmd, bool wait=false) {
         if (!cmd) return;
-        gchar *argv[] = {"sh", "-c", cmd, NULL};
+        gchar *ex_cmd = g_strdup_printf("exec %s", cmd);
+        gchar *argv[] = {"sh", "-c", ex_cmd, NULL};
         GSpawnFlags flags = G_SPAWN_SEARCH_PATH;
         GError *err = NULL;
         gboolean success;
+        GPid pid;
 
-        if (should_wait) {
+        if (wait) {
             success = g_spawn_sync(
                 NULL, argv, NULL, flags, NULL, NULL, NULL, NULL,
                 NULL, &err);
         } else {
+            flags = (GSpawnFlags)(flags | G_SPAWN_DO_NOT_REAP_CHILD);
             success = g_spawn_async(
-                NULL, argv, NULL, flags, NULL, NULL, NULL, &err);
+                NULL, argv, NULL, flags, NULL, NULL, &pid, &err);
+            if (success) {
+                g_child_watch_add(pid, child_watch_cb, this);
+                children.insert(pid);
+            }
         }
+        g_free(ex_cmd);
         if (!success) {
             g_critical("%s", err->message);
             g_error_free(err);
         }
+    }
+
+    void EventManager::child_watch_cb(GPid pid, gint status, gpointer data) {
+        EventManager *_this = static_cast<EventManager*>(data);
+        _this->children.erase(pid);
+        g_spawn_close_pid(pid);
+    }
+
+    void EventManager::kill_children() {
+        if (kill_on_resume) {
+            for (GPid pid : children) {
+                if (kill(pid, SIGTERM) != 0) {
+                    g_warning("kill: %s", strerror(errno));
+                }
+            }
+        }
+        children.clear();
     }
 
     void EventManager::enable_idle_hint(int64_t timeout_ms) {
@@ -125,13 +152,14 @@ namespace Xidlechain {
                 }
                 break;
             case EVENT_ACTIVITY_RESUME:
+                kill_children();
                 for (Command &cmd : activity_commands) {
                     deactivate(cmd);
                 }
                 set_idle_hint(false);
                 break;
             case EVENT_SLEEP:
-                exec_cmd(sleep_cmd.before_cmd);
+                exec_cmd(sleep_cmd.before_cmd, wait_before_sleep);
                 break;
             case EVENT_WAKE:
                 exec_cmd(sleep_cmd.after_cmd);

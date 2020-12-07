@@ -16,10 +16,10 @@ CUR_BRIGHTNESS=$(backlight-dbus | awk '{print $1}')
 # lock on suspend and on receiving the Lock signal.
 # The brightness will be reset to its original value after
 # user activity is detected or the system is woken from sleep.
-xidlechain -w \
-    timeout 1200 "backlight-dbus 5%" \
+xidlechain \
+    timeout 1200 "backlight-dbus -t 5 5%" \
         resume "backlight-dbus $CUR_BRIGHTNESS" \
     timeout 1260 "systemctl suspend" \
     before-sleep "locker.sh" \
-    after-resume "backlight-dbus $CUR_BRIGHTNESS" \
+    after-wake "backlight-dbus $CUR_BRIGHTNESS" \
     lock "locker.sh" &

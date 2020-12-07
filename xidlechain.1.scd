@@ -16,11 +16,15 @@ xidlechain - Idle manager for X
 *-d*
 	Enable debug output.
 
-*-w*
-	Wait for command to finish executing before continuing, helpful for ensuring
-	that a *before-sleep* command has finished before the system goes to sleep.
+*--no-wait-before-sleep*
+	Do not wait for the before-sleep command to finish when the system is suspending.
+	By default, xidlechain will wait (block) for this command to finish before the
+	system goes to sleep.
 
-	Note: using this option causes xidlechain to block until the command finishes.
+*--no-kill-on-resume*
+	Do not kill child processes from the timeout commands when user activity resumes.
+	By default, xidlechain will send a SIGTERM to these processes when resuming from
+	inactivity.
 
 *--ignore-audio*
 	Ignore audio events. By default, timeouts are disabled while audio is playing.
@@ -46,7 +50,7 @@ command line. Systemd is required.
 	the option InhibitDelayMaxSec. A command that has not finished by then will
 	continue running after resuming from sleep.
 
-*after-resume* <command>
+*after-wake* <command>
 	Executes _command_ after logind signals that the computer resumed from sleep.
 
 *lock* <command>
@@ -60,7 +64,7 @@ command line. Systemd is required.
 	Adding an idlehint event will also cause xidlechain to call
 	SetIdleHint(false) when first run, as well as on resume and unlock events.
 
-All commands are executed in a shell.
+All commands are prepended with 'exec' and run with 'sh -c'.
 
 # ENVIRONMENT VARIABLES
 
@@ -71,19 +75,23 @@ one which matches the current user and has a seat.
 # EXAMPLE
 
 ```
-xidlechain -w \\
+xidlechain \\
 	timeout 300 'i3lock -c 000000' \\
 	timeout 600 'xset dpms force off' \\
 		resume 'xset dpms force on' \\
-	before-sleep 'i3lock -c 000000'
+	before-sleep 'i3lock -c 000000' \\
+	after-wake 'xset dpms force on'
 ```
 
 This will lock your screen after 300 seconds of inactivity, then turn off your
-displays after another 300 seconds, and turn your screens back on when resumed.
-It will also lock your screen before your computer goes to sleep.
+displays after another 300 seconds, and turn your screens back on when user
+activity is detected.
+It will also lock your screen before your computer goes to sleep, and turn
+the screen back on when the computer wakes up.
 
-To make sure xidlechain waits for i3lock to lock the screen before it releases the
-inhibition lock, the *-w* options is used in xidlechain (i3lock forks by default).
+Note that the before-sleep command must exit as quickly as possible since
+xidlechain will wait for it complete before releasing the Inhibit lock
+(to disable this behaviour, use the --no-wait-before-sleep flag).
 
 # AUTHORS
 

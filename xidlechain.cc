@@ -79,10 +79,13 @@ static int parse_idlehint(int argc, char **argv, Xidlechain::EventManager &manag
 
 int main(int argc, char *argv[]) {
     int ch;
-    int ignore_audio = 0;
-    bool should_wait = false;
+    int ignore_audio = 0,
+        wait_before_sleep = 1,
+        kill_on_resume = 1;
     static struct option long_options[] = {
         {"ignore-audio", no_argument, &ignore_audio, 1},
+        {"no-wait-before-sleep", no_argument, &wait_before_sleep, 0},
+        {"no-kill-on-resume", no_argument, &kill_on_resume, 1},
         {0,0,0,0}
     };
     int option_index = 0;
@@ -90,16 +93,13 @@ int main(int argc, char *argv[]) {
 
     try {
         for (;;) {
-            ch = getopt_long(argc, argv, "hdw", long_options, &option_index);
+            ch = getopt_long(argc, argv, "hd", long_options, &option_index);
             if (ch == -1) break;
             switch (ch) {
                 case 0:
                     break;
                 case 'd':
                     putenv("G_MESSAGES_DEBUG=all");
-                    break;
-                case 'w':
-                    should_wait = true;
                     break;
                 case 'h':
                 case '?':
@@ -108,16 +108,20 @@ int main(int argc, char *argv[]) {
             }
         }
     } catch (ShowUsage&) {
-        printf("Usage: %s [OPTIONS]\n"
+        printf("Usage: %s [OPTIONS] [COMMANDS]\n"
                "  -h\tthis help menu\n"
                "  -d\tdebug\n"
-               "  -w\twait for command to finish\n",
+               "  --ignore-audio\n\t\tignore audio events\n"
+               "  --no-wait-before-sleep\n\t\tdon't wait for "
+                   "before-sleep command to finish\n"
+               "  --no-kill-on-resume\n\t\tdon't kill "
+                   "child processes on resume",
                argv[0]);
         return ch == 'h' ? 0 : 1;
     }
 
     gdk_init(&argc, &argv);
-    if (!event_manager.init(should_wait, ignore_audio)) {
+    if (!event_manager.init(wait_before_sleep, kill_on_resume, ignore_audio)) {
         return 1;
     }
 
@@ -134,7 +138,7 @@ int main(int argc, char *argv[]) {
         } else if (strcmp("before-sleep", argv[i]) == 0) {
             i += parse_one_cmd(argc-i, argv+i, Xidlechain::EVENT_SLEEP,
                                event_manager);
-        } else if (strcmp("after-resume", argv[i]) == 0) {
+        } else if (strcmp("after-wake", argv[i]) == 0) {
             i += parse_one_cmd(argc-i, argv+i, Xidlechain::EVENT_WAKE,
                                event_manager);
         } else if (strcmp("idlehint", argv[i]) == 0) {
