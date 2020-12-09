@@ -1,0 +1,23 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: install-deps
+      run: apt update && apt install -y libgtk2.0-dev libxext-dev libpulse-dev g++ make
+    - name: make
+      run: make
+    - name: make tests
+      run: make tests
+    - name: event_manager_test
+      run: tests/event_manager_test
