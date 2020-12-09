@@ -1,3 +1,5 @@
+![C/C++ CI](https://github.com/maxerenberg/xidlechain/workflows/C/C++%20CI/badge.svg)
+
 # xidlechain
 
 This is an idle manager for X. It aims to have an interface similar to that of
