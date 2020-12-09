@@ -8,6 +8,12 @@ xidlechain - Idle manager for X
 
 *xidlechain* [options] [events...]
 
+# DESCRIPTION
+
+xidlechain listens for idle activity on your X session and executes tasks
+on various idle-related events. You can specify any number of events at the
+command line. Systemd is required.
+
 # OPTIONS
 
 *-h*
@@ -29,12 +35,6 @@ xidlechain - Idle manager for X
 *--ignore-audio*
 	Ignore audio events. By default, timeouts are disabled while audio is playing.
 
-# DESCRIPTION
-
-xidlechain listens for idle activity on your X session and executes tasks
-on various idle-related events. You can specify any number of events at the
-command line. Systemd is required.
-
 # EVENTS
 
 *timeout* <timeout> <timeout command> [resume <resume command>]
@@ -54,13 +54,13 @@ command line. Systemd is required.
 	Executes _command_ after logind signals that the computer resumed from sleep.
 
 *lock* <command>
-	Executes _command_ when logind signals that the session should be locked
+	Executes _command_ when logind signals that the session should be locked.
 
 *unlock* <command>
-	Executes _command_ when logind signals that the session should be unlocked
+	Executes _command_ when logind signals that the session should be unlocked.
 
 *idlehint* <timeout>
-	Set IdleHint to indcate an idle logind session after <timeout> seconds.
+	Set IdleHint to indicate an idle logind session after <timeout> seconds.
 	Adding an idlehint event will also cause xidlechain to call
 	SetIdleHint(false) when first run, as well as on resume and unlock events.
 
@@ -90,7 +90,7 @@ It will also lock your screen before your computer goes to sleep, and turn
 the screen back on when the computer wakes up.
 
 Note that the before-sleep command must exit as quickly as possible since
-xidlechain will wait for it complete before releasing the Inhibit lock
+xidlechain will wait for it to complete before releasing the Inhibit lock
 (to disable this behaviour, use the --no-wait-before-sleep flag).
 
 # AUTHORS
