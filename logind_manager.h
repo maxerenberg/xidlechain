@@ -6,6 +6,18 @@
 
 namespace Xidlechain {
     class LogindManager {
+    public:
+        // Initializes the detector and specifies the event receiver.
+        // Emits the following signals (with NULL as data) upon
+        // detection from logind: LOCK, UNLOCK, SLEEP, WAKE.
+        virtual bool init(EventReceiver *receiver) = 0;
+        // Sets the value of the "IdleHint" (see systemd-logind docs).
+        virtual bool set_idle_hint(bool idle) = 0;
+    protected:
+        virtual ~LogindManager() = default;
+    };
+
+    class DbusLogindManager: public LogindManager {
         EventReceiver *event_receiver;
         GDBusProxy *manager_proxy,
                    *session_proxy;
@@ -26,12 +38,12 @@ namespace Xidlechain {
             GDBusProxy *proxy, gchar *sender_name, gchar *signal_name,
             GVariant *parameters, gpointer user_data);
     public:
-        LogindManager();
-        ~LogindManager();
+        DbusLogindManager();
+        ~DbusLogindManager();
 
-        bool init(EventReceiver *receiver);
+        bool init(EventReceiver *receiver) override;
 
-        bool set_idle_hint(bool idle);
+        bool set_idle_hint(bool idle) override;
     };
 }
 

@@ -3,7 +3,11 @@
 #include <getopt.h>
 #include <sstream>
 #include <gdk/gdk.h>
+#include "activity_detector.h"
+#include "audio_detector.h"
 #include "event_manager.h"
+#include "logind_manager.h"
+#include "process_spawner.h"
 
 using namespace std;
 
@@ -51,7 +55,7 @@ static int parse_one_cmd(int argc, char **argv, Xidlechain::EventType event_type
             manager.set_sleep_cmd(argv[1]);
             break;
         case Xidlechain::EVENT_WAKE:
-            manager.set_resume_cmd(argv[1]);
+            manager.set_wake_cmd(argv[1]);
             break;
         default:
             g_critical("Unrecognized event type %d", event_type);
@@ -89,7 +93,6 @@ int main(int argc, char *argv[]) {
         {0,0,0,0}
     };
     int option_index = 0;
-    Xidlechain::EventManager event_manager;
 
     try {
         for (;;) {
@@ -121,9 +124,18 @@ int main(int argc, char *argv[]) {
     }
 
     gdk_init(&argc, &argv);
-    if (!event_manager.init(wait_before_sleep, kill_on_resume, ignore_audio)) {
-        return 1;
-    }
+    Xidlechain::EventManager event_manager(wait_before_sleep,
+                                           kill_on_resume,
+                                           ignore_audio);
+    Xidlechain::XsyncActivityDetector activity_detector;
+    Xidlechain::PulseAudioDetector audio_detector;
+    Xidlechain::DbusLogindManager logind_manager;
+    Xidlechain::GProcessSpawner process_spawner;
+    bool success = event_manager.init(&activity_detector,
+                                      &logind_manager,
+                                      &audio_detector,
+                                      &process_spawner);
+    if (!success) return 1;
 
     int i = optind;
     while (i < argc) {

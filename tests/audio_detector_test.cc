@@ -1,6 +1,6 @@
 #include <iostream>
 #include <glib.h>
-#include "audio_manager.h"
+#include "audio_detector.h"
 
 using namespace std;
 
@@ -22,8 +22,8 @@ public:
 
 int main() {
     MyReceiver receiver;
-    Xidlechain::AudioManager audio_manager;
-    if (!audio_manager.init(&receiver)) {
+    Xidlechain::PulseAudioDetector audio_detector;
+    if (!audio_detector.init(&receiver)) {
         return 1;
     }
 

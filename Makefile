@@ -4,10 +4,9 @@ EXT_DEPS = gdk-2.0 gio-unix-2.0 xext libpulse libpulse-mainloop-glib
 CXXFLAGS = -Wall -MMD -std=c++17 -Wno-write-strings -iquote ./ \
 	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
 LDLIBS = $(shell pkg-config --libs $(EXT_DEPS))
-DETECTOR_OBJECTS = activity_manager.o logind_manager.o audio_manager.o
-OBJECTS = xidlechain.o event_manager.o ${DETECTOR_OBJECTS}
-TEST_OBJECTS = tests/activity_manager_test.o tests/logind_manager_test.o \
-	tests/audio_manager_test.o
+COMMON_OBJECTS = event_manager.o activity_detector.o logind_manager.o \
+	audio_detector.o process_spawner.o
+OBJECTS = xidlechain.o $(COMMON_OBJECTS)
 DEPENDS = ${OBJECTS:.o=.d}
 PREFIX = ~/.local
 
@@ -33,16 +32,19 @@ uninstall:
 	rm -f ${PREFIX}/share/man/man1/xidlechain.1
 	mandb -q
 
-tests: ${TEST_OBJECTS} ${DETECTOR_OBJECTS}
-	${CXX} -o tests/activity_manager_test \
-		tests/activity_manager_test.o activity_manager.o \
-		`pkg-config --libs gdk-2.0 xext`
-	${CXX} -o tests/logind_manager_test \
-		tests/logind_manager_test.o logind_manager.o \
-		`pkg-config --libs gio-unix-2.0`
-	${CXX} -o tests/audio_manager_test \
-		tests/audio_manager_test.o audio_manager.o \
-		`pkg-config --libs glib-2.0` -lpulse -lpulse-mainloop-glib
+activity_detector_test: tests/activity_detector_test.o activity_detector.o
+	${CXX} -o tests/$@ $^ `pkg-config --libs gdk-2.0 xext`
+
+logind_manager_test: tests/logind_manager_test.o logind_manager.o
+	${CXX} -o tests/$@ $^ `pkg-config --libs gio-unix-2.0`
+
+audio_detector_test: tests/audio_detector_test.o audio_detector.o
+	${CXX} -o tests/$@ $^ `pkg-config --libs libpulse libpulse-mainloop-glib`
+
+event_manager_test: tests/event_manager_test.o event_manager.o
+	${CXX} -o tests/$@ $^ `pkg-config --libs glib-2.0`
+
+tests: activity_detector_test logind_manager_test audio_detector_test event_manager_test
 
 -include ${DEPENDS}
 

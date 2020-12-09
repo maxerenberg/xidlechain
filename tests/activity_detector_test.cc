@@ -1,6 +1,6 @@
 #include <iostream>
 #include <gdk/gdk.h>
-#include "activity_manager.h"
+#include "activity_detector.h"
 #include "event_receiver.h"
 
 using namespace std;
@@ -24,10 +24,10 @@ public:
 int main(int argc, char *argv[]) {
     gdk_init(&argc, &argv);
     MyReceiver receiver;
-    Xidlechain::ActivityManager activity_manager;
-    activity_manager.init(&receiver);
-    activity_manager.add_idle_timeout(2000, (gpointer)1L);
-    activity_manager.add_idle_timeout(5000, (gpointer)2L);
+    Xidlechain::XsyncActivityDetector activity_detector;
+    activity_detector.init(&receiver);
+    activity_detector.add_idle_timeout(2000, (gpointer)1L);
+    activity_detector.add_idle_timeout(5000, (gpointer)2L);
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(loop);
 }

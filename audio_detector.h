@@ -1,5 +1,5 @@
-#ifndef _AUDIO_MANAGER_H_
-#define _AUDIO_MANAGER_H_
+#ifndef _AUDIO_DETECTOR_H_
+#define _AUDIO_DETECTOR_H_
 
 #include <unordered_set>
 #include <pulse/pulseaudio.h>
@@ -9,7 +9,14 @@
 using std::unordered_set;
 
 namespace Xidlechain {
-    class AudioManager {
+    class AudioDetector {
+    public:
+        // Emits an AUDIO_RUNNING event when at least one sink is running,
+        // and an AUDIO_STOPPED event when all sinks are idle.
+        virtual bool init(EventReceiver *receiver) = 0;
+    };
+
+    class PulseAudioDetector: public AudioDetector {
         EventReceiver *event_receiver;
         pa_glib_mainloop *loop;
         pa_mainloop_api *api;
@@ -33,8 +40,8 @@ namespace Xidlechain {
             uint32_t idx,
             void *userdata);
     public:
-        AudioManager();
-        ~AudioManager();
+        PulseAudioDetector();
+        ~PulseAudioDetector();
         bool init(EventReceiver *receiver);
     };
 }

@@ -27,7 +27,7 @@ public:
 };
 
 int main() {
-    Xidlechain::LogindManager manager;
+    Xidlechain::DbusLogindManager manager;
     MyReceiver receiver;
     if (!manager.init(&receiver)) {
         return 1;

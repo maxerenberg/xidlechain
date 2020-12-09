@@ -1,10 +1,10 @@
-#include "audio_manager.h"
+#include "audio_detector.h"
 
 using std::pair;
 using std::unordered_set;
 
 namespace Xidlechain {
-    AudioManager::AudioManager():
+    PulseAudioDetector::PulseAudioDetector():
         event_receiver(NULL),
         loop(NULL),
         api(NULL),
@@ -12,7 +12,7 @@ namespace Xidlechain {
         sent_first_message(false)
     {}
 
-    AudioManager::~AudioManager() {
+    PulseAudioDetector::~PulseAudioDetector() {
         if (ctx) {
             pa_context_unref(ctx);
         }
@@ -21,7 +21,7 @@ namespace Xidlechain {
         }
     }
 
-    bool AudioManager::init(EventReceiver *receiver) {
+    bool PulseAudioDetector::init(EventReceiver *receiver) {
         int status;
         g_return_val_if_fail(receiver != NULL, FALSE);
         event_receiver = receiver;
@@ -40,7 +40,7 @@ namespace Xidlechain {
         return true;
     }
 
-    void AudioManager::add_sink(int idx) {
+    void PulseAudioDetector::add_sink(int idx) {
         bool inserted = running_sinks.insert(idx).second;
         if ((running_sinks.size() == 1 && inserted) || !sent_first_message) {
             event_receiver->receive(EVENT_AUDIO_RUNNING, NULL);
@@ -48,7 +48,7 @@ namespace Xidlechain {
         }
     }
 
-    void AudioManager::remove_sink(int idx) {
+    void PulseAudioDetector::remove_sink(int idx) {
         bool erased = running_sinks.erase(idx) > 0;
         if ((running_sinks.size() == 0 && erased) || !sent_first_message) {
             event_receiver->receive(EVENT_AUDIO_STOPPED, NULL);
@@ -56,7 +56,7 @@ namespace Xidlechain {
         }
     }
 
-    void AudioManager::context_notify_cb(pa_context *ctx, void *userdata) {
+    void PulseAudioDetector::context_notify_cb(pa_context *ctx, void *userdata) {
         switch (pa_context_get_state(ctx)) {
             case PA_CONTEXT_READY: {
                 pa_context_get_sink_info_list(ctx, sink_info_cb, userdata);
@@ -79,7 +79,7 @@ namespace Xidlechain {
         }
     }
 
-    void AudioManager::sink_info_cb(pa_context *ctx, const pa_sink_info *info,
+    void PulseAudioDetector::sink_info_cb(pa_context *ctx, const pa_sink_info *info,
                                     int eol, void *userdata)
     {
         if (eol > 0) {  // end of list was reached
@@ -88,7 +88,7 @@ namespace Xidlechain {
             g_warning("Error occurred querying pulseaudio server");
             return;
         }
-        AudioManager *_this = static_cast<AudioManager*>(userdata);
+        PulseAudioDetector *_this = static_cast<PulseAudioDetector*>(userdata);
         switch (info->state) {
             case PA_SINK_RUNNING:
                 _this->add_sink(info->index);
@@ -100,7 +100,7 @@ namespace Xidlechain {
         }
     }
 
-    void AudioManager::context_success_cb(pa_context *ctx, int success,
+    void PulseAudioDetector::context_success_cb(pa_context *ctx, int success,
                                           void *userdata)
     {
         if (!success) {
@@ -108,13 +108,13 @@ namespace Xidlechain {
         }
     }
 
-    void AudioManager::context_subscribe_cb(
+    void PulseAudioDetector::context_subscribe_cb(
             pa_context *ctx,
             pa_subscription_event_type_t event_type,
             uint32_t idx,
             void *userdata)
     {
-        AudioManager *_this = static_cast<AudioManager*>(userdata);
+        PulseAudioDetector *_this = static_cast<PulseAudioDetector*>(userdata);
         switch (event_type & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) {
             case PA_SUBSCRIPTION_EVENT_SINK: {
                 if ((event_type & PA_SUBSCRIPTION_EVENT_TYPE_MASK)

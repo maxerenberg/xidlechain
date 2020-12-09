@@ -9,19 +9,19 @@
 using std::runtime_error;
 
 namespace Xidlechain {
-    const char * const LogindManager::BUS_NAME = "org.freedesktop.login1",
-               * const LogindManager::MANAGER_OBJECT_PATH = "/org/freedesktop/login1",
-               * const LogindManager::MANAGER_INTERFACE_NAME = "org.freedesktop.login1.Manager",
-               * const LogindManager::SESSION_INTERFACE_NAME = "org.freedesktop.login1.Session";
+    const char * const DbusLogindManager::BUS_NAME = "org.freedesktop.login1",
+               * const DbusLogindManager::MANAGER_OBJECT_PATH = "/org/freedesktop/login1",
+               * const DbusLogindManager::MANAGER_INTERFACE_NAME = "org.freedesktop.login1.Manager",
+               * const DbusLogindManager::SESSION_INTERFACE_NAME = "org.freedesktop.login1.Session";
 
-    LogindManager::LogindManager():
+    DbusLogindManager::DbusLogindManager():
         event_receiver(NULL),
         manager_proxy(NULL),
         session_proxy(NULL),
         sleep_lock_fd(-1)
     {}
 
-    LogindManager::~LogindManager() {
+    DbusLogindManager::~DbusLogindManager() {
         if (manager_proxy) {
             g_object_unref(manager_proxy);
         }
@@ -33,7 +33,7 @@ namespace Xidlechain {
         }
     }
 
-    char *LogindManager::get_session_id() {
+    char *DbusLogindManager::get_session_id() {
         char *session_id = getenv("XDG_SESSION_ID");
         if (session_id && session_id[0] != '\0') {
             return strdup(session_id);
@@ -76,7 +76,7 @@ namespace Xidlechain {
         throw runtime_error("Session ID not found");
     }
 
-    bool LogindManager::init(EventReceiver *receiver) {
+    bool DbusLogindManager::init(EventReceiver *receiver) {
         GError *err = NULL;
         GVariant *res = NULL;
         g_return_val_if_fail(receiver != NULL, FALSE);
@@ -134,7 +134,7 @@ namespace Xidlechain {
         return true;
     }
 
-    void LogindManager::acquire_sleep_lock() {
+    void DbusLogindManager::acquire_sleep_lock() {
         if (sleep_lock_fd >= 0) return;
 
         GError *err = NULL;
@@ -161,7 +161,7 @@ namespace Xidlechain {
         if (err) throw err;
     }
 
-    bool LogindManager::set_idle_hint(bool idle) {
+    bool DbusLogindManager::set_idle_hint(bool idle) {
         GError *err = NULL;
         g_return_val_if_fail(session_proxy != NULL, FALSE);
         g_info("Setting idle hint to %s", idle ? "true" : "false");
@@ -182,11 +182,11 @@ namespace Xidlechain {
         return true;
     }
 
-    void LogindManager::login1_session_signal_cb(
+    void DbusLogindManager::login1_session_signal_cb(
             GDBusProxy *proxy, gchar *sender_name, gchar *signal_name,
             GVariant *parameters, gpointer user_data)
     {
-        LogindManager *_this = static_cast<LogindManager*>(user_data);
+        DbusLogindManager *_this = static_cast<DbusLogindManager*>(user_data);
         if (strcmp(signal_name, "Lock") == 0) {
             g_info("Received Lock signal");
             _this->event_receiver->receive(EVENT_LOCK, NULL);
@@ -196,11 +196,11 @@ namespace Xidlechain {
         }
     }
 
-    void LogindManager::login1_manager_signal_cb(
+    void DbusLogindManager::login1_manager_signal_cb(
             GDBusProxy *proxy, gchar *sender_name, gchar *signal_name,
             GVariant *parameters, gpointer user_data)
     {
-        LogindManager *_this = static_cast<LogindManager*>(user_data);
+        DbusLogindManager *_this = static_cast<DbusLogindManager*>(user_data);
         if (strcmp(signal_name, "PrepareForSleep") != 0) {
             return;
         }

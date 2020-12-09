@@ -4,7 +4,7 @@
 #include <gdk/gdkx.h>
 #include <glib.h>
 #include <limits>
-#include "activity_manager.h"
+#include "activity_detector.h"
 
 using std::numeric_limits;
 using std::pair;
@@ -19,18 +19,18 @@ static inline void XSyncInt64ToValue(XSyncValue* xvalue, int64_t value) {
 }
 
 namespace Xidlechain {
-    ActivityManager::ActivityManager():
+    XsyncActivityDetector::XsyncActivityDetector():
         idle_counter_id(0),
         min_timeout(numeric_limits<int64_t>::max()),
         neg_trans_alarm(None),
         event_receiver(NULL)
     {}
 
-    ActivityManager::~ActivityManager() {
+    XsyncActivityDetector::~XsyncActivityDetector() {
         clear_timeouts();
     }
 
-    bool ActivityManager::init(EventReceiver *receiver) {
+    bool XsyncActivityDetector::init(EventReceiver *receiver) {
         g_return_val_if_fail(receiver != NULL, FALSE);
         g_return_val_if_fail(GDK_DISPLAY() != NULL, FALSE);
         event_receiver = receiver;
@@ -62,7 +62,7 @@ namespace Xidlechain {
         return true;
     }
 
-    bool ActivityManager::add_idle_timeout(int64_t timeout_ms, gpointer data) {
+    bool XsyncActivityDetector::add_idle_timeout(int64_t timeout_ms, gpointer data) {
         g_return_val_if_fail(idle_counter_id != 0, FALSE);
         g_return_val_if_fail(timeout_ms > 1, FALSE);
 
@@ -85,7 +85,7 @@ namespace Xidlechain {
         return true;
     }
 
-    XSyncAlarm ActivityManager::create_idle_alarm(int64_t timeout_ms,
+    XSyncAlarm XsyncActivityDetector::create_idle_alarm(int64_t timeout_ms,
                                                   XSyncTestType test_type)
     {
         uint64_t mask = XSyncCACounter |
@@ -100,7 +100,7 @@ namespace Xidlechain {
         return XSyncCreateAlarm(GDK_DISPLAY(), mask, &attr);
     }
 
-    bool ActivityManager::clear_timeouts() {
+    bool XsyncActivityDetector::clear_timeouts() {
         for (const pair<XSyncAlarm, gpointer> &p : pos_trans_alarms) {
             XSyncDestroyAlarm(GDK_DISPLAY(), p.first);
         }
@@ -113,13 +113,13 @@ namespace Xidlechain {
         return true;
     }
 
-    GdkFilterReturn ActivityManager::gdk_event_filter(
+    GdkFilterReturn XsyncActivityDetector::gdk_event_filter(
         GdkXEvent *gxevent, GdkEvent *gevent, gpointer data)
     {
         XEvent* xevent = static_cast<XEvent*>(gxevent);
         XSyncAlarmNotifyEvent* alarm_event =
             static_cast<XSyncAlarmNotifyEvent*>(gxevent);
-        ActivityManager* _this = static_cast<ActivityManager*>(data);
+        XsyncActivityDetector* _this = static_cast<XsyncActivityDetector*>(data);
         XSyncValue value;
 
         if (xevent->type == _this->sync_event_base + XSyncAlarmNotify &&

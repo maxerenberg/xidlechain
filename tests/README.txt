@@ -11,3 +11,6 @@ and `loginctl unlock-session`. Suspending the system can be triggered using
 
 The AudioManager test should print Running and Stopped events when the
 total number of running sinks transitions between 1 and 0.
+
+The EventManager test mocks out the detectors and the process spawner
+to test the EventManager event logic. It should run and return successfully.
