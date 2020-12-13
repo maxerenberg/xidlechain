@@ -5,7 +5,7 @@
 #define _ACTIVITY_DETECTOR_H_
 
 #include <unordered_map>
-#include <gdk/gdkevents.h>
+#include <gdk/gdk.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/sync.h>
 #include "event_receiver.h"
@@ -40,6 +40,7 @@ namespace Xidlechain {
         // period of time, then became active again.
         XSyncAlarm neg_trans_alarm;
         EventReceiver *event_receiver;
+        Display *xdisplay;
 
         XSyncAlarm create_idle_alarm(int64_t timeout_ms, XSyncTestType test_type);
 

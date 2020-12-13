@@ -15,7 +15,7 @@ an external screen locker.
 
 Install dependencies:
 
-* gtk2.0
+* gtk3
 * Xext (X11 extensions)
 * pulseaudio
 * [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional: man pages)
@@ -23,11 +23,11 @@ Install dependencies:
 
 On Debian, these can be installed with the following command:
 
-    apt install libgtk2.0-dev libxext-dev libpulse-dev scdoc g++
+    apt install libgtk-3-dev libxext-dev libpulse-dev scdoc g++
 
 On Fedora:
 
-    dnf install gtk2-devel libXext-devel pulseaudio-libs-devel scdoc g++
+    dnf install gtk3-devel libXext-devel pulseaudio-libs-devel scdoc g++
 
 Once the dependencies have been installed, run the following:
 

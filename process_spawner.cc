@@ -1,3 +1,4 @@
+#include <cerrno>
 #include "process_spawner.h"
 
 namespace Xidlechain {

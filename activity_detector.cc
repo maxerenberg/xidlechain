@@ -23,7 +23,8 @@ namespace Xidlechain {
         idle_counter_id(0),
         min_timeout(numeric_limits<int64_t>::max()),
         neg_trans_alarm(None),
-        event_receiver(NULL)
+        event_receiver(NULL),
+        xdisplay(NULL)
     {}
 
     XsyncActivityDetector::~XsyncActivityDetector() {
@@ -32,17 +33,20 @@ namespace Xidlechain {
 
     bool XsyncActivityDetector::init(EventReceiver *receiver) {
         g_return_val_if_fail(receiver != NULL, FALSE);
-        g_return_val_if_fail(GDK_DISPLAY() != NULL, FALSE);
         event_receiver = receiver;
+
+        xdisplay = gdk_x11_get_default_xdisplay();
+        g_return_val_if_fail(xdisplay != NULL, FALSE);
+
         int major_version, minor_version;
-        if (!(XSyncQueryExtension(GDK_DISPLAY(), &sync_event_base, &sync_error_base) &&
-              XSyncInitialize(GDK_DISPLAY(), &major_version, &minor_version)))
+        if (!(XSyncQueryExtension(xdisplay, &sync_event_base, &sync_error_base) &&
+              XSyncInitialize(xdisplay, &major_version, &minor_version)))
         {
             g_critical("Failed to initialize XSync extension");
             return false;
         }
         int ncounters;
-        XSyncSystemCounter *counters = XSyncListSystemCounters(GDK_DISPLAY(), &ncounters);
+        XSyncSystemCounter *counters = XSyncListSystemCounters(xdisplay, &ncounters);
         if (counters) {
             for (int i = 0; i < ncounters; i++) {
                 if (counters[i].name && strcmp(counters[i].name, "IDLETIME") == 0) {
@@ -74,7 +78,7 @@ namespace Xidlechain {
             XSyncAlarm alarm = create_idle_alarm(min_timeout-1, XSyncNegativeTransition);
             g_return_val_if_fail(alarm != None, FALSE);
             if (neg_trans_alarm) {
-                XSyncDestroyAlarm(GDK_DISPLAY(), neg_trans_alarm);
+                XSyncDestroyAlarm(xdisplay, neg_trans_alarm);
             }
             neg_trans_alarm = alarm;
         }
@@ -97,16 +101,16 @@ namespace Xidlechain {
         attr.trigger.test_type = test_type;
         XSyncInt64ToValue(&attr.trigger.wait_value, timeout_ms);
         XSyncIntToValue(&attr.delta, 0);
-        return XSyncCreateAlarm(GDK_DISPLAY(), mask, &attr);
+        return XSyncCreateAlarm(xdisplay, mask, &attr);
     }
 
     bool XsyncActivityDetector::clear_timeouts() {
         for (const pair<XSyncAlarm, gpointer> &p : pos_trans_alarms) {
-            XSyncDestroyAlarm(GDK_DISPLAY(), p.first);
+            XSyncDestroyAlarm(xdisplay, p.first);
         }
         pos_trans_alarms.clear();
         if (neg_trans_alarm) {
-            XSyncDestroyAlarm(GDK_DISPLAY(), neg_trans_alarm);
+            XSyncDestroyAlarm(xdisplay, neg_trans_alarm);
             neg_trans_alarm = None;
         }
         min_timeout = numeric_limits<int64_t>::max();
@@ -124,7 +128,7 @@ namespace Xidlechain {
 
         if (xevent->type == _this->sync_event_base + XSyncAlarmNotify &&
             alarm_event->state != XSyncAlarmDestroyed &&
-            XSyncQueryCounter(GDK_DISPLAY(), _this->idle_counter_id, &value))
+            XSyncQueryCounter(_this->xdisplay, _this->idle_counter_id, &value))
         {
             bool is_idle = !XSyncValueLessThan(alarm_event->counter_value,
                                                alarm_event->alarm_value);

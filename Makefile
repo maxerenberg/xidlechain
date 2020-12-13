@@ -1,5 +1,5 @@
 CXX = g++
-EXT_DEPS = gdk-2.0 gio-unix-2.0 xext libpulse libpulse-mainloop-glib
+EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 xext libpulse libpulse-mainloop-glib
 # don't include all the GLib headers inside the .d files
 CXXFLAGS = -Wall -MMD -std=c++17 -Wno-write-strings -iquote ./ \
 	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
@@ -25,15 +25,15 @@ manpage:
 install: xidlechain manpage
 	install -D -t ${PREFIX}/bin/ xidlechain
 	install -D -t ${PREFIX}/share/man/man1 xidlechain.1
-	mandb -q
+	mandb -u -q
 
 uninstall:
 	rm -f ${PREFIX}/bin/xidlechain
 	rm -f ${PREFIX}/share/man/man1/xidlechain.1
-	mandb -q
+	mandb -u -q
 
 activity_detector_test: tests/activity_detector_test.o activity_detector.o
-	${CXX} -o tests/$@ $^ `pkg-config --libs gdk-2.0 xext`
+	${CXX} -o tests/$@ $^ `pkg-config --libs gdk-x11-3.0 xext`
 
 logind_manager_test: tests/logind_manager_test.o logind_manager.o
 	${CXX} -o tests/$@ $^ `pkg-config --libs gio-unix-2.0`
