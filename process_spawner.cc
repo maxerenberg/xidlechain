@@ -3,9 +3,11 @@
 #include "process_spawner.h"
 
 namespace Xidlechain {
+    GProcessSpawner::GProcessSpawner(char *shell): shell(shell) {}
+
     void GProcessSpawner::exec_cmd(char *cmd, bool wait) {
         if (!cmd) return;
-        gchar *argv[] = {"sh", "-c", cmd, NULL};
+        gchar *argv[] = {shell, "-c", cmd, NULL};
         GSpawnFlags flags = G_SPAWN_SEARCH_PATH;
         GError *err = NULL;
         gboolean success;

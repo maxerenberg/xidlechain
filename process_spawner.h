@@ -14,8 +14,10 @@ namespace Xidlechain {
     };
 
     class GProcessSpawner: public ProcessSpawner {
+        char *shell;
         void exec_cmd(char *cmd, bool wait);
     public:
+        GProcessSpawner(char *shell);
         void exec_cmd_sync(char *cmd) override;
         void exec_cmd_async(char *cmd) override;
     };

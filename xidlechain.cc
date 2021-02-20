@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
     int ch;
     int ignore_audio = 0,
         wait_before_sleep = 1;
+    char *shell = "sh";
     static struct option long_options[] = {
         {"ignore-audio", no_argument, &ignore_audio, 1},
         {"no-wait-before-sleep", no_argument, &wait_before_sleep, 0},
@@ -94,13 +95,16 @@ int main(int argc, char *argv[]) {
 
     try {
         for (;;) {
-            ch = getopt_long(argc, argv, "hd", long_options, &option_index);
+            ch = getopt_long(argc, argv, "dhs:", long_options, &option_index);
             if (ch == -1) break;
             switch (ch) {
                 case 0:
                     break;
                 case 'd':
                     putenv("G_MESSAGES_DEBUG=all");
+                    break;
+                case 's':
+                    shell = optarg;
                     break;
                 case 'h':
                 case '?':
@@ -112,6 +116,7 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s [OPTIONS] [COMMANDS]\n"
                "  -h\tthis help menu\n"
                "  -d\tdebug\n"
+               "  -s <shell>\tshell to use for spawning processes\n"
                "  --ignore-audio\n\t\tignore audio events\n"
                "  --no-wait-before-sleep\n\t\tdon't wait for "
                    "before-sleep command to finish\n",
@@ -120,12 +125,11 @@ int main(int argc, char *argv[]) {
     }
 
     gdk_init(&argc, &argv);
-    Xidlechain::EventManager event_manager(wait_before_sleep,
-                                           ignore_audio);
+    Xidlechain::EventManager event_manager(wait_before_sleep, ignore_audio);
     Xidlechain::XsyncActivityDetector activity_detector;
     Xidlechain::PulseAudioDetector audio_detector;
     Xidlechain::DbusLogindManager logind_manager;
-    Xidlechain::GProcessSpawner process_spawner;
+    Xidlechain::GProcessSpawner process_spawner(shell);
     bool success = event_manager.init(&activity_detector,
                                       &logind_manager,
                                       &audio_detector,

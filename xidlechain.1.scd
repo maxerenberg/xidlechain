@@ -22,6 +22,11 @@ command line. Systemd is required.
 *-d*
 	Enable debug output.
 
+*-s <shell>*
+	The shell to use when spawning processes (e.g. "bash").
+	The shell will be passed two arguments: "-c", and the command specified.
+	Default is "sh".
+
 *--no-wait-before-sleep*
 	Do not wait for the before-sleep command to finish when the system is suspending.
 	By default, xidlechain will wait (block) for this command to finish before the
@@ -37,7 +42,7 @@ command line. Systemd is required.
 
 	If you specify "resume <resume_command>", _resume_command_ will be run when
 	there is activity again. Resume commands are executed in the order in which
-        they are specified on the command line.
+	they are specified on the command line.
 
 *before-sleep* <command>
 	Executes _command_ before systemd puts the computer to sleep.
@@ -59,8 +64,6 @@ command line. Systemd is required.
 	Set IdleHint to indicate an idle logind session after <timeout> seconds.
 	Adding an idlehint event will also cause xidlechain to call
 	SetIdleHint(false) when first run, as well as on resume and unlock events.
-
-All commands are prepended with 'exec' and run with 'sh -c'.
 
 # ENVIRONMENT VARIABLES
 
