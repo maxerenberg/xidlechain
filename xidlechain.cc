@@ -84,12 +84,10 @@ static int parse_idlehint(int argc, char **argv, Xidlechain::EventManager &manag
 int main(int argc, char *argv[]) {
     int ch;
     int ignore_audio = 0,
-        wait_before_sleep = 1,
-        kill_on_resume = 1;
+        wait_before_sleep = 1;
     static struct option long_options[] = {
         {"ignore-audio", no_argument, &ignore_audio, 1},
         {"no-wait-before-sleep", no_argument, &wait_before_sleep, 0},
-        {"no-kill-on-resume", no_argument, &kill_on_resume, 1},
         {0,0,0,0}
     };
     int option_index = 0;
@@ -116,16 +114,13 @@ int main(int argc, char *argv[]) {
                "  -d\tdebug\n"
                "  --ignore-audio\n\t\tignore audio events\n"
                "  --no-wait-before-sleep\n\t\tdon't wait for "
-                   "before-sleep command to finish\n"
-               "  --no-kill-on-resume\n\t\tdon't kill "
-                   "child processes on resume",
+                   "before-sleep command to finish\n",
                argv[0]);
         return ch == 'h' ? 0 : 1;
     }
 
     gdk_init(&argc, &argv);
     Xidlechain::EventManager event_manager(wait_before_sleep,
-                                           kill_on_resume,
                                            ignore_audio);
     Xidlechain::XsyncActivityDetector activity_detector;
     Xidlechain::PulseAudioDetector audio_detector;

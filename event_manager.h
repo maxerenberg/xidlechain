@@ -28,7 +28,6 @@ namespace Xidlechain {
         Command sleep_cmd,
                 lock_cmd;
         bool wait_before_sleep,
-             kill_on_resume,
              ignore_audio,
              idlehint_enabled,
              audio_playing;
@@ -43,8 +42,7 @@ namespace Xidlechain {
         void deactivate(Command &cmd);
         void set_idle_hint(bool idle);
     public:
-        EventManager(bool wait_before_sleep, bool kill_on_resume,
-                     bool ignore_audio);
+        EventManager(bool wait_before_sleep, bool ignore_audio);
         // Crude dependency injection.
         bool init(ActivityDetector *activity_detector,
                   LogindManager *logind_manager,

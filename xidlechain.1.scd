@@ -27,21 +27,17 @@ command line. Systemd is required.
 	By default, xidlechain will wait (block) for this command to finish before the
 	system goes to sleep.
 
-*--no-kill-on-resume*
-	Do not kill child processes from the timeout commands when user activity resumes.
-	By default, xidlechain will send a SIGTERM to these processes when resuming from
-	inactivity.
-
 *--ignore-audio*
 	Ignore audio events. By default, timeouts are disabled while audio is playing.
 
 # EVENTS
 
-*timeout* <timeout> <timeout command> [resume <resume command>]
-	Execute _timeout command_ if there is no activity for <timeout> seconds.
+*timeout* <timeout> <timeout_command> [resume <resume_command>]
+	Execute _timeout_command_ if there is no activity for <timeout> seconds.
 
-	If you specify "resume <resume command>", _resume command_ will be run when
-	there is activity again.
+	If you specify "resume <resume_command>", _resume_command_ will be run when
+	there is activity again. Resume commands are executed in the order in which
+        they are specified on the command line.
 
 *before-sleep* <command>
 	Executes _command_ before systemd puts the computer to sleep.

@@ -24,10 +24,8 @@ namespace Xidlechain {
     // messages we send, which are array indices.
     const int64_t EventManager::idlehint_sentinel = -1;
 
-    EventManager::EventManager(bool wait_before_sleep, bool kill_on_resume,
-                               bool ignore_audio):
+    EventManager::EventManager(bool wait_before_sleep, bool ignore_audio):
         wait_before_sleep(wait_before_sleep),
-        kill_on_resume(kill_on_resume),
         ignore_audio(ignore_audio),
         idlehint_enabled(false),
         audio_playing(false),
@@ -50,7 +48,7 @@ namespace Xidlechain {
         this->process_spawner = process_spawner;
         return activity_detector->init(this)
             && logind_manager->init(this)
-            && (ignore_audio ? true : audio_detector->init(this));
+            && (ignore_audio || audio_detector->init(this));
     }
 
     void EventManager::add_timeout_command(char *before_cmd, char *after_cmd,
@@ -125,9 +123,6 @@ namespace Xidlechain {
                 }
                 break;
             case EVENT_ACTIVITY_RESUME:
-                if (kill_on_resume) {
-                    process_spawner->kill_children();
-                }
                 for (Command &cmd : activity_commands) {
                     deactivate(cmd);
                 }
