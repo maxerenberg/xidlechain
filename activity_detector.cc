@@ -105,7 +105,7 @@ namespace Xidlechain {
     }
 
     bool XsyncActivityDetector::clear_timeouts() {
-        for (const pair<XSyncAlarm, gpointer> &p : pos_trans_alarms) {
+        for (const pair<const XSyncAlarm, gpointer> &p : pos_trans_alarms) {
             XSyncDestroyAlarm(xdisplay, p.first);
         }
         pos_trans_alarms.clear();

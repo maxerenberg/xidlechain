@@ -3,35 +3,23 @@
 #include <unistd.h>
 #include "activity_detector.h"
 #include "audio_detector.h"
+#include "config_manager.h"
 #include "event_manager.h"
 #include "logind_manager.h"
 #include "process_spawner.h"
 
 namespace Xidlechain {
-    Command::Command():
-         activated(false), before_cmd(NULL), after_cmd(NULL),
-         timeout_ms(0)
-    {}
-
-    Command::Command(char *before_cmd, char *after_cmd, int64_t timeout_ms):
-         activated(false), before_cmd(before_cmd), after_cmd(after_cmd),
-         timeout_ms(timeout_ms)
-    {}
-
-    Command::~Command() {}
-
     // Use a negative value to differentiate it from the other
     // messages we send, which are array indices.
     const int64_t EventManager::idlehint_sentinel = -1;
 
-    EventManager::EventManager(bool wait_before_sleep, bool ignore_audio):
-        wait_before_sleep(wait_before_sleep),
-        ignore_audio(ignore_audio),
-        idlehint_enabled(false),
-        audio_playing(false),
-        activity_detector(NULL),
-        logind_manager(NULL),
-        process_spawner(NULL)
+    EventManager::EventManager(ConfigManager *cfg):
+        audio_playing{false},
+        activity_commands{cfg->activity_commands},
+        activity_detector{NULL},
+        cfg{cfg},
+        logind_manager{NULL},
+        process_spawner{NULL}
     {}
 
     bool EventManager::init(ActivityDetector *activity_detector,
@@ -46,52 +34,36 @@ namespace Xidlechain {
         this->activity_detector = activity_detector;
         this->logind_manager = logind_manager;
         this->process_spawner = process_spawner;
-        return activity_detector->init(this)
-            && logind_manager->init(this)
-            && (ignore_audio || audio_detector->init(this));
-    }
-
-    void EventManager::add_timeout_command(char *before_cmd, char *after_cmd,
-                                           int64_t timeout_ms)
-    {
-        g_return_if_fail(timeout_ms > 1);
-        int64_t i = activity_commands.size();
-        activity_commands.emplace_back(
-            Command{before_cmd, after_cmd, timeout_ms});
-        // Send the index of the command so that we know later which
-        // command to activate
-        activity_detector->add_idle_timeout(timeout_ms, (gpointer)i);
-    }
-
-    void EventManager::set_sleep_cmd(char *cmd) {
-        sleep_cmd.before_cmd = cmd;
-    }
-
-    void EventManager::set_wake_cmd(char *cmd) {
-        sleep_cmd.after_cmd = cmd;
-    }
-
-    void EventManager::set_lock_cmd(char *cmd) {
-        lock_cmd.before_cmd = cmd;
-    }
-
-    void EventManager::set_unlock_cmd(char *cmd) {
-        lock_cmd.after_cmd = cmd;
-    }
-
-    void EventManager::enable_idle_hint(int64_t timeout_ms) {
-        if (idlehint_enabled) {
-            g_warning("Idle hint timeout can only be set once");
-            return;
+        if (!activity_detector->init(this)) {
+            return false;
         }
-        g_return_if_fail(timeout_ms > 1);
-        idlehint_enabled = true;
-        // Send the sentinel value so that we know it's not an index
-        // for activity_commands
-        activity_detector->add_idle_timeout(
-            timeout_ms, (gpointer)idlehint_sentinel);
-        // Set the idle hint to false when we first start
-        set_idle_hint(false);
+        if (!logind_manager->init(this)) {
+            return false;
+        }
+        if (!cfg->ignore_audio && !audio_detector->init(this)) {
+            return false;
+        }
+        if (cfg->idlehint_is_enabled()) {
+            // Send the sentinel value so that we know it's not an index
+            // for activity_commands
+            activity_detector->add_idle_timeout(
+                (int64_t)cfg->idlehint_timeout_sec * 1000,
+                (gpointer)idlehint_sentinel
+            );
+        }
+        if (cfg->disable_automatic_dpms_activation) {
+            process_spawner->exec_cmd_sync("xset dpms 0 0 0");
+        }
+        if (cfg->disable_screensaver) {
+            process_spawner->exec_cmd_sync("xset s off");
+        }
+        for (int64_t i = 0; i < (int64_t)cfg->activity_commands.size(); i++) {
+            const Command &cmd = cfg->activity_commands[i];
+            // Send the index of the command so that we know later which
+            // command to activate
+            activity_detector->add_idle_timeout(cmd.timeout_ms, (gpointer)i);
+        }
+        return true;
     }
 
     void EventManager::activate(Command &cmd) {
@@ -107,7 +79,7 @@ namespace Xidlechain {
     }
 
     void EventManager::set_idle_hint(bool idle) {
-        if (idlehint_enabled) {
+        if (cfg->idlehint_is_enabled()) {
             logind_manager->set_idle_hint(idle);
         }
     }
@@ -129,21 +101,21 @@ namespace Xidlechain {
                 set_idle_hint(false);
                 break;
             case EVENT_SLEEP:
-                if (wait_before_sleep) {
-                    process_spawner->exec_cmd_sync(sleep_cmd.before_cmd);
+                if (cfg->wait_before_sleep) {
+                    process_spawner->exec_cmd_sync(cfg->sleep_cmd.before_cmd);
                 } else {
-                    process_spawner->exec_cmd_async(sleep_cmd.before_cmd);
+                    process_spawner->exec_cmd_async(cfg->sleep_cmd.before_cmd);
                 }
                 break;
             case EVENT_WAKE:
-                process_spawner->exec_cmd_async(sleep_cmd.after_cmd);
+                process_spawner->exec_cmd_async(cfg->sleep_cmd.after_cmd);
                 set_idle_hint(false);
                 break;
             case EVENT_LOCK:
-                process_spawner->exec_cmd_async(lock_cmd.before_cmd);
+                process_spawner->exec_cmd_async(cfg->lock_cmd.before_cmd);
                 break;
             case EVENT_UNLOCK:
-                process_spawner->exec_cmd_async(lock_cmd.after_cmd);
+                process_spawner->exec_cmd_async(cfg->lock_cmd.after_cmd);
                 set_idle_hint(false);
                 break;
             case EVENT_AUDIO_RUNNING:

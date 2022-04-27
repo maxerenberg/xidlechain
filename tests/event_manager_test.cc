@@ -1,12 +1,16 @@
+#include <iostream>
 #include <locale>
+#include <string>
 #include <vector>
 #include <glib.h>
 #include "activity_detector.h"
 #include "audio_detector.h"
+#include "config_manager.h"
 #include "event_manager.h"
 #include "logind_manager.h"
 #include "process_spawner.h"
 
+using std::string;
 using std::vector;
 using namespace Xidlechain;
 
@@ -58,13 +62,13 @@ public:
 
 class MockProcessSpawner: public ProcessSpawner {
 public:
-    vector<char*> sync_cmds,
-                  async_cmds;
-    void exec_cmd_sync(char *cmd) override {
-        sync_cmds.push_back(cmd);
+    vector<const char*> sync_cmds,
+                        async_cmds;
+    void exec_cmd_sync(const string &cmd) override {
+        sync_cmds.push_back(cmd.c_str());
     }
-    void exec_cmd_async(char *cmd) override {
-        async_cmds.push_back(cmd);
+    void exec_cmd_async(const string &cmd) override {
+        async_cmds.push_back(cmd.c_str());
     }
     void reset() {
         sync_cmds.clear();
@@ -92,18 +96,19 @@ static bool event_manager_init(EventManager &event_manager) {
 }
 
 static void test_activity_1(gpointer, gconstpointer user_data) {
-    bool wait_before_sleep = false,
-         ignore_audio = false;
     int num_timeouts = (long)user_data;
-    EventManager event_manager(wait_before_sleep, ignore_audio);
-    event_manager_init(event_manager);
+    ConfigManager config_manager;
+    config_manager.wait_before_sleep = false;
+    config_manager.ignore_audio = false;
     char before_cmds[][3] = {"b1", "b2"};
     char after_cmds[][3] = {"a1", "a2"};
     // It shouldn't matter if the timeouts are passed in non-sorted order
     int64_t timeouts[] = {3000, 2000};
     // add both timeouts
-    event_manager.add_timeout_command(before_cmds[0], after_cmds[0], timeouts[0]);
-    event_manager.add_timeout_command(before_cmds[1], after_cmds[1], timeouts[1]);
+    config_manager.activity_commands.emplace_back(Command(before_cmds[0], after_cmds[0], timeouts[0]));
+    config_manager.activity_commands.emplace_back(Command(before_cmds[1], after_cmds[1], timeouts[1]));
+    EventManager event_manager(&config_manager);
+    event_manager_init(event_manager);
     g_assert_cmpuint(activity_detector.cb_data.size(), ==, 2);
     // trigger each timeout one at a time
     event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[1]);
@@ -130,15 +135,18 @@ static void test_activity_1(gpointer, gconstpointer user_data) {
 }
 
 static void test_sleep_1(gpointer, gconstpointer user_data) {
-    bool ignore_audio = false;
-    bool wait_before_sleep = (bool)user_data;
-    EventManager event_manager(wait_before_sleep, ignore_audio);
+    ConfigManager config_manager;
+    config_manager.wait_before_sleep = (bool)user_data;
+    config_manager.ignore_audio = false;
+    config_manager.disable_automatic_dpms_activation  = false;
+    config_manager.disable_screensaver = false;
+    config_manager.sleep_cmd.before_cmd = "s1";
+    config_manager.sleep_cmd.after_cmd = "w1";
+    EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
-    event_manager.set_sleep_cmd("s1");
-    event_manager.set_wake_cmd("w1");
     // send a SLEEP signal
     event_manager.receive(EVENT_SLEEP, NULL);
-    if (wait_before_sleep) {
+    if (config_manager.wait_before_sleep) {
         g_assert_cmpuint(process_spawner.sync_cmds.size(), ==, 1);
         g_assert_cmpstr(process_spawner.sync_cmds.at(0), ==, "s1");
     } else {
@@ -147,7 +155,7 @@ static void test_sleep_1(gpointer, gconstpointer user_data) {
     }
     // send a WAKE signal
     event_manager.receive(EVENT_WAKE, NULL);
-    if (wait_before_sleep) {
+    if (config_manager.wait_before_sleep) {
         g_assert_cmpuint(process_spawner.async_cmds.size(), ==, 1);
         g_assert_cmpstr(process_spawner.async_cmds.at(0), ==, "w1");
     } else {
@@ -157,15 +165,16 @@ static void test_sleep_1(gpointer, gconstpointer user_data) {
 }
 
 static void test_audio_1(gpointer, gconstpointer user_data) {
-    bool wait_before_sleep = false;
-    bool ignore_audio = (bool)user_data;
-    EventManager event_manager(wait_before_sleep, ignore_audio);
+    ConfigManager config_manager;
+    config_manager.wait_before_sleep = false;
+    config_manager.ignore_audio = (bool)user_data;
+    config_manager.activity_commands.emplace_back(Command("b1", "a1", 2000));
+    EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
-    if (ignore_audio) {
+    if (config_manager.ignore_audio) {
         g_assert_cmpint(audio_detector.initialized, ==, 0);
         return;
     }
-    event_manager.add_timeout_command("b1", "a1", 2000);
 
     event_manager.receive(EVENT_AUDIO_RUNNING, NULL);
     // timeout should have been cleared
@@ -179,26 +188,30 @@ static void test_audio_1(gpointer, gconstpointer user_data) {
 }
 
 static void test_idlehint(gpointer, gconstpointer) {
-    EventManager event_manager(false, false);
+    ConfigManager config_manager;
+    config_manager.wait_before_sleep = false;
+    config_manager.ignore_audio = false;
+    config_manager.idlehint_timeout_sec = 2;
+    EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
-    event_manager.enable_idle_hint(2000);
     // verify that a timeout was registered
     g_assert_cmpuint(activity_detector.cb_data.size(), ==, 1);
-    // IdleHint is set to false when we first start
-    g_assert_cmpint(logind_manager.idle_hint_history.at(0), ==, false);
     event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[0]);
     // IdleHint should be set to true
-    g_assert_cmpint(logind_manager.idle_hint_history.at(1), ==, true);
+    g_assert_cmpint(logind_manager.idle_hint_history.at(0), ==, true);
     event_manager.receive(EVENT_ACTIVITY_RESUME, activity_detector.cb_data[0]);
     // IdleHint should be set to false
-    g_assert_cmpint(logind_manager.idle_hint_history.at(2), ==, false);
+    g_assert_cmpint(logind_manager.idle_hint_history.at(1), ==, false);
 }
 
 static void test_lock(gpointer, gconstpointer) {
-    EventManager event_manager(false, false);
+    ConfigManager config_manager;
+    config_manager.wait_before_sleep = false;
+    config_manager.ignore_audio = false;
+    config_manager.lock_cmd.before_cmd = "l1";
+    config_manager.lock_cmd.after_cmd = "u1";
+    EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
-    event_manager.set_lock_cmd("l1");
-    event_manager.set_unlock_cmd("u1");
 
     event_manager.receive(EVENT_LOCK, NULL);
     g_assert_cmpstr(process_spawner.async_cmds.at(0), ==, "l1");
