@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <locale>
 #include <string>
@@ -24,6 +25,14 @@ public:
     bool add_idle_timeout(int64_t timeout_ms, gpointer data) override {
         cb_data.push_back(data);
         return true;
+    }
+    bool remove_idle_timeout(gpointer data) override {
+        vector<gpointer>::iterator it = std::find(cb_data.begin(), cb_data.end(), data);
+        if (it != cb_data.end()) {
+            cb_data.erase(it);
+            return true;
+        }
+        return false;
     }
     bool clear_timeouts() override {
         cb_data.clear();

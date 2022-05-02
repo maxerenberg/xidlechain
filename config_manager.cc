@@ -83,6 +83,8 @@ namespace Xidlechain {
 
     static bool remove_command_from_list(vector<Command> &list, Command &cmd) {
         for (vector<Command>::iterator it = list.begin(); it != list.end(); it++) {
+            // It's OK to just compare pointers here because once we emplace
+            // a Command into a vector, we never move it out.
             if (&(*it) == &cmd) {
                 list.erase(it);
                 return true;
