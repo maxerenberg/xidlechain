@@ -21,6 +21,7 @@ namespace Xidlechain {
         // be emitted with |data| as the data parameter. If activity resumes,
         // an ACTIVITY_RESUME event will be emitted with NULL for the data.
         virtual bool add_idle_timeout(int64_t timeout_ms, gpointer data) = 0;
+        virtual bool remove_idle_timeout(gpointer data) = 0;
         // Deletes all timers.
         virtual bool clear_timeouts() = 0;
     protected:
@@ -36,6 +37,7 @@ namespace Xidlechain {
         // These alarms trigger when a user becomes inactive for a certain
         // period of time.
         unordered_map<XSyncAlarm, gpointer> pos_trans_alarms;
+        unordered_map<gpointer, XSyncAlarm> pos_trans_alarms_by_data;
         // This alarms triggers when a user used to be inactive for a certain
         // period of time, then became active again.
         XSyncAlarm neg_trans_alarm;
@@ -43,8 +45,9 @@ namespace Xidlechain {
         Display *xdisplay;
 
         XSyncAlarm create_idle_alarm(int64_t timeout_ms, XSyncTestType test_type);
-
-        static GdkFilterReturn gdk_event_filter(
+        GdkFilterReturn gdk_event_filter(
+            GdkXEvent *gxevent, GdkEvent *gevent);
+        static GdkFilterReturn static_gdk_event_filter(
             GdkXEvent *gxevent, GdkEvent *gevent, gpointer data);
     public:
         XsyncActivityDetector();
@@ -55,6 +58,7 @@ namespace Xidlechain {
         bool init(EventReceiver *receiver) override;
 
         bool add_idle_timeout(int64_t timeout_ms, gpointer data) override;
+        bool remove_idle_timeout(gpointer data) override;
 
         bool clear_timeouts() override;
     };

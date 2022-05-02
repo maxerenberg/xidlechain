@@ -9,7 +9,7 @@ using std::string;
 
 namespace Xidlechain {
     void GProcessSpawner::exec_cmd(const string &cmd, bool wait) {
-        if (cmd == "") return;
+        if (cmd.empty()) return;
         g_debug("Executing command '%s'", cmd.c_str());
         const gchar *argv[] = {"sh", "-c", cmd.c_str(), NULL};
         GSpawnFlags flags = G_SPAWN_SEARCH_PATH;

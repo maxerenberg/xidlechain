@@ -39,8 +39,12 @@ General options are placed under the *[Main]* section:
 	disabled while audio is playing. The default value is false.
 
 *wait_before_sleep* = _true_ or _false_
-	If true, xidlechain will wait for the before-sleep command to finish
+	If true, xidlechain will wait for actions triggered by *sleep* to finish
 	when the system is suspending. The default value is true.
+
+	Note: this only delays sleeping up to the limit set in *logind.conf(5)* by
+	the option InhibitDelayMaxSec. A command that has not finished by then will
+	continue running after resuming from sleep.
 
 *idlehint_timeout* = _timeout_sec_
 	After _timeout_sec_ seconds, xidlechain will call SetIdleHint(true) on
@@ -57,37 +61,51 @@ General options are placed under the *[Main]* section:
 	If true, the X11 screensaver extension will be disabled by executing
 	'xset s off'. The default value is true.
 
-*lock_exec* = _command_
-	Execute _command_ when logind signals that the session should be locked.
-
-*unlock_exec* = _command_
-	Execute _command_ when logind signals that the session should be unlocked.
-
-*before_sleep_exec* = _command_
-	Execute _command_ before systemd puts the computer to sleep.
-
-	Note: this only delays sleeping up to the limit set in *logind.conf(5)* by
-	the option InhibitDelayMaxSec. A command that has not finished by then will
-	continue running after resuming from sleep.
-
-*after_wake_exec* = _command_
-	Execute _command_ after logind signals that the computer resumed from sleep.
-
 ## ACTION SECTIONS
 Custom actions may be specified in sections beginning with the prefix 'Action '.
-Each action section may have the following entries:
+Each action section may have the following entries.
 
-*timeout* = _timeout_sec_
-	Execute the command in *exec* if there is no activity for _timeout_sec_
-	seconds.
+*trigger* = _trigger_
+	When the trigger is activated, the *exec* command is executed. When it
+	is deactivated, the *resume_exec* command is executed. Required.
 
 *exec* = _command_
-	Execute this command if there is no activity for the period specified in
-	*timeout*.
+	Execute this command when the trigger activates. Optional.
 
 *resume_exec* = _command_
-	Execute this command if activity resumes after the inactivity period
-	specified in *timeout*. This entry is optional.
+	Execute this command when the trigger deactivates. Optional.
+
+At least one of *exec* and *resume_exec* must be specified.
+
+## TRIGGERS
+Each trigger must be one of the following:
+
+*timeout <seconds>*
+	Activated after the specified number of seconds of inactivity.
+	Deactivated once activity resumes.
+
+*sleep*
+	Activated when the system suspends (i.e. "goes to sleep") and
+	deactivated when it resumes.
+
+*lock*
+	Activated when the system is locked and deactivated when it is
+	unlocked. Note that this refers to the LockSession and
+	UnlockSession dbus methods of *org.freedesktop.login1(5)*.
+
+## COMMANDS
+If a command starts with the string "builtin:", then one of the builtin actions
+below will be executed; otherwise, it is assumed to be a shell command, and it
+will be executed with "sh -c".
+
+*builtin:dim*
+	Dim the monitor's brightness to 0 over a period of five seconds.
+
+*builtin:undim*
+	Restore the monitor's brightness from before the dimming started.
+
+*builtin:suspend*
+	Suspend the system (i.e. "go to sleep").
 
 ## SAMPLE CONFIGURATION
 ```
@@ -98,24 +116,27 @@ idlehint_timeout = 0
 disable_automatic_dpms_activation = true
 disable_screensaver = true
 
-lock_exec = ~/bin/locker.sh
-
 [Action dim]
-timeout = 600
-exec = ~/bin/brightness.sh dim
-resume_exec = ~/bin/brightness.sh restore
+trigger = timeout 600
+exec = builtin:dim
+resume_exec = builtin:undim
 
 [Action turn off monitor]
-timeout = 660
+trigger = timeout 660
 exec = xset dpms force off
-
-[Action restore brightness before going to sleep]
-timeout = 1198
-exec = xset dpms force on && ~/bin/brightness.sh restore
+resume_exec = xset dpms force on
 
 [Action suspend]
-timeout = 1200
-exec = systemctl suspend
+trigger = timeout 1200
+exec = builtin:suspend
+
+[Action turn on monitor on resume]
+trigger = sleep
+resume_exec = xset dpms force on
+
+[Action restore brightness on resume]
+trigger = sleep
+resume_exec = builtin:undim
 ```
 
 # ENVIRONMENT VARIABLES

@@ -15,6 +15,7 @@ namespace Xidlechain {
         EVENT_UNLOCK,
         EVENT_AUDIO_RUNNING,
         EVENT_AUDIO_STOPPED,
+        EVENT_COMMAND_DELETED,
     };
 
     class EventReceiver {

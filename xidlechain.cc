@@ -5,6 +5,7 @@
 #include <gdk/gdk.h>
 #include "activity_detector.h"
 #include "audio_detector.h"
+#include "brightness_controller.h"
 #include "config_manager.h"
 #include "event_manager.h"
 #include "logind_manager.h"
@@ -60,10 +61,12 @@ int main(int argc, char *argv[]) {
     Xidlechain::PulseAudioDetector audio_detector;
     Xidlechain::DbusLogindManager logind_manager;
     Xidlechain::GProcessSpawner process_spawner;
+    Xidlechain::DbusBrightnessController brightness_controller;
     bool success = event_manager.init(&activity_detector,
                                       &logind_manager,
                                       &audio_detector,
-                                      &process_spawner);
+                                      &process_spawner,
+                                      &brightness_controller);
     if (!success) return EXIT_FAILURE;
 
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);

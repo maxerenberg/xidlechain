@@ -2,18 +2,84 @@
 #define _COMMAND_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
+using std::int64_t;
 using std::string;
+using std::unique_ptr;
 
 namespace Xidlechain {
-    struct Command {
-        bool activated;
-        string before_cmd;
-        string after_cmd;
+    class BrightnessController;
+    class ProcessSpawner;
+    class LogindManager;
+
+    class Command {
+    public:
+        struct ActionExecutors {
+            BrightnessController *brightness_controller;
+            ProcessSpawner *process_spawner;
+            LogindManager *logind_manager;
+        };
+
+        class Action {
+        public:
+            static unique_ptr<Action> factory(const char *cmd_str);
+            // async by default
+            virtual bool execute(const ActionExecutors &executors) = 0;
+            virtual bool execute_sync(const ActionExecutors &executors) {
+                return execute(executors);
+            }
+            virtual ~Action() = default;
+        };
+
+        class ShellAction: public Action {
+            string cmd;
+        public:
+            ShellAction(const char *cmd);
+            bool execute(const ActionExecutors &executors) override;
+            bool execute_sync(const ActionExecutors &executors) override;
+        };
+
+        class DimAction: public Action {
+        public:
+            bool execute(const ActionExecutors &executors) override;
+        };
+
+        class UndimAction: public Action {
+        public:
+            bool execute(const ActionExecutors &executors) override;
+        };
+
+        class SuspendAction: public Action {
+        public:
+            bool execute(const ActionExecutors &executors) override;
+        };
+
+        enum Trigger {
+            NONE,
+            TIMEOUT,
+            SLEEP,
+            LOCK
+        };
+
+        string name;
+        Trigger trigger;
+        // Only used for TIMEOUT commands
         int64_t timeout_ms;
+        unique_ptr<Action> activation_action;
+        unique_ptr<Action> deactivation_action;
+
         Command();
-        Command(const char *before_cmd, const char *after_cmd, int64_t timeout_ms);
+        void activate(const ActionExecutors &executors, bool sync=false);
+        void deactivate(const ActionExecutors &executors, bool sync=false);
+        bool is_activated() const;
+    private:
+        // Only used for TIMEOUT commands
+        // We need this because when activity is detected, we need to
+        // run the deactivation actions only for the commands which have
+        // been activated.
+        bool activated;
     };
 }
 

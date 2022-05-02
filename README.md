@@ -2,12 +2,8 @@
 
 # xidlechain
 
-This is an idle manager for X. It aims to have an interface similar to that of
-[swayidle](https://github.com/swaywm/swayidle).
-See the man page, `xidlechain(1)`, for instructions on configuring xidlechain.
-
-See [here](examples/idle.sh) for an example on how to use xidlechain with
-an external screen locker.
+This is an idle manager for X.
+See the man page [xidlechain(1)](xidlechain.scd.1) for configuration instructions.
 
 ## Installation
 
@@ -16,6 +12,7 @@ an external screen locker.
 Install dependencies:
 
 * gtk3
+* libgudev
 * Xext (X11 extensions)
 * pulseaudio
 * [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional: man pages)
@@ -23,11 +20,11 @@ Install dependencies:
 
 On Debian, these can be installed with the following command:
 
-    apt install libgtk-3-dev libxext-dev libpulse-dev scdoc g++
+    apt install libgtk-3-dev libgudev-1.0-dev libxext-dev libpulse-dev scdoc g++
 
 On Fedora:
 
-    dnf install gtk3-devel libXext-devel pulseaudio-libs-devel scdoc g++
+    dnf install gtk3-devel libgudev-devel libXext-devel pulseaudio-libs-devel scdoc g++
 
 Once the dependencies have been installed, run the following:
 

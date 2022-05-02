@@ -2,6 +2,7 @@
 #define _CONFIG_MANAGER_H_
 
 #include <string>
+#include <memory>
 #include <vector>
 
 #include <glib.h>
@@ -10,6 +11,7 @@
 
 using std::char_traits;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 namespace Xidlechain {
@@ -20,10 +22,11 @@ namespace Xidlechain {
 
         bool parse_main_section(GKeyFile *key_file, gchar *group);
         bool parse_action_section(GKeyFile *key_file, gchar *group);
+        vector<Command>& list_for(Command::Trigger trigger);
     public:
-        vector<Command> activity_commands;
-        Command sleep_cmd;
-        Command lock_cmd;
+        vector<Command> timeout_commands;
+        vector<Command> sleep_commands;
+        vector<Command> lock_commands;
         bool ignore_audio = false;
         bool wait_before_sleep = true;
         int idlehint_timeout_sec = 0;
@@ -32,6 +35,9 @@ namespace Xidlechain {
 
         bool parse_config_file(const string &filename);
         bool idlehint_is_enabled() const;
+        void add_command(Command &&cmd);
+        bool find_command(const string &name, Command::Trigger trigger, Command **cmd);
+        bool remove_command(Command &cmd);
     };
 }
 

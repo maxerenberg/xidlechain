@@ -5,6 +5,7 @@
 #include <glib.h>
 #include "activity_detector.h"
 #include "audio_detector.h"
+#include "brightness_controller.h"
 #include "config_manager.h"
 #include "event_manager.h"
 #include "logind_manager.h"
@@ -58,6 +59,12 @@ public:
     void reset() {
         idle_hint_history.clear();
     }
+    bool set_brightness(const char *subsystem, unsigned int value) override {
+        return true;
+    }
+    bool suspend() override {
+        return true;
+    }
 };
 
 class MockProcessSpawner: public ProcessSpawner {
@@ -76,10 +83,17 @@ public:
     }
 };
 
+class MockBrightnessController: public BrightnessController {
+    bool init(LogindManager *logind_manager) { return true; }
+    bool dim() { return true; }
+    void restore_brightness() {}
+};
+
 MockActivityDetector activity_detector;
 MockAudioDetector audio_detector;
 MockLogindManager logind_manager;
 MockProcessSpawner process_spawner;
+MockBrightnessController brightness_controller;
 
 static void fixture_setup(gpointer fixture, gconstpointer user_data) {
     activity_detector.reset();
@@ -92,7 +106,22 @@ static bool event_manager_init(EventManager &event_manager) {
     return event_manager.init(&activity_detector,
                               &logind_manager,
                               &audio_detector,
-                              &process_spawner);
+                              &process_spawner,
+                              &brightness_controller);
+}
+
+static Command make_command(
+    const char *exec,
+    const char *resume_exec,
+    int64_t timeout_ms,
+    Command::Trigger trigger = Command::TIMEOUT
+) {
+    Command cmd;
+    cmd.trigger = trigger;
+    cmd.activation_action = Command::Action::factory(exec);
+    cmd.deactivation_action = Command::Action::factory(resume_exec);
+    cmd.timeout_ms = timeout_ms;
+    return cmd;
 }
 
 static void test_activity_1(gpointer, gconstpointer user_data) {
@@ -105,8 +134,8 @@ static void test_activity_1(gpointer, gconstpointer user_data) {
     // It shouldn't matter if the timeouts are passed in non-sorted order
     int64_t timeouts[] = {3000, 2000};
     // add both timeouts
-    config_manager.activity_commands.emplace_back(Command(before_cmds[0], after_cmds[0], timeouts[0]));
-    config_manager.activity_commands.emplace_back(Command(before_cmds[1], after_cmds[1], timeouts[1]));
+    config_manager.timeout_commands.emplace_back(make_command(before_cmds[0], after_cmds[0], timeouts[0]));
+    config_manager.timeout_commands.emplace_back(make_command(before_cmds[1], after_cmds[1], timeouts[1]));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     g_assert_cmpuint(activity_detector.cb_data.size(), ==, 2);
@@ -140,8 +169,7 @@ static void test_sleep_1(gpointer, gconstpointer user_data) {
     config_manager.ignore_audio = false;
     config_manager.disable_automatic_dpms_activation  = false;
     config_manager.disable_screensaver = false;
-    config_manager.sleep_cmd.before_cmd = "s1";
-    config_manager.sleep_cmd.after_cmd = "w1";
+    config_manager.sleep_commands.emplace_back(make_command("s1", "w1", 0, Command::SLEEP));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     // send a SLEEP signal
@@ -168,7 +196,7 @@ static void test_audio_1(gpointer, gconstpointer user_data) {
     ConfigManager config_manager;
     config_manager.wait_before_sleep = false;
     config_manager.ignore_audio = (bool)user_data;
-    config_manager.activity_commands.emplace_back(Command("b1", "a1", 2000));
+    config_manager.timeout_commands.emplace_back(make_command("b1", "a1", 2000));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     if (config_manager.ignore_audio) {
@@ -208,8 +236,7 @@ static void test_lock(gpointer, gconstpointer) {
     ConfigManager config_manager;
     config_manager.wait_before_sleep = false;
     config_manager.ignore_audio = false;
-    config_manager.lock_cmd.before_cmd = "l1";
-    config_manager.lock_cmd.after_cmd = "u1";
+    config_manager.lock_commands.emplace_back(make_command("l1", "u1", 0, Command::LOCK));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
 

@@ -56,7 +56,7 @@ namespace Xidlechain {
             }
             XSyncFreeSystemCounterList(counters);
             if (idle_counter_id) {
-                gdk_window_add_filter(NULL, gdk_event_filter, this);
+                gdk_window_add_filter(NULL, static_gdk_event_filter, this);
             }
         }
         if (idle_counter_id == 0) {
@@ -86,6 +86,19 @@ namespace Xidlechain {
         XSyncAlarm alarm = create_idle_alarm(timeout_ms, XSyncPositiveTransition);
         g_return_val_if_fail(alarm != None, FALSE);
         pos_trans_alarms[alarm] = data;
+        pos_trans_alarms_by_data[data] = alarm;
+        return true;
+    }
+
+    bool XsyncActivityDetector::remove_idle_timeout(gpointer data) {
+        unordered_map<gpointer, XSyncAlarm>::iterator it = pos_trans_alarms_by_data.find(data);
+        if (it == pos_trans_alarms_by_data.end()) {
+            return false;
+        }
+        XSyncAlarm alarm = it->second;
+        XSyncDestroyAlarm(xdisplay, alarm);
+        pos_trans_alarms.erase(alarm);
+        pos_trans_alarms_by_data.erase(it);
         return true;
     }
 
@@ -109,6 +122,7 @@ namespace Xidlechain {
             XSyncDestroyAlarm(xdisplay, p.first);
         }
         pos_trans_alarms.clear();
+        pos_trans_alarms_by_data.clear();
         if (neg_trans_alarm) {
             XSyncDestroyAlarm(xdisplay, neg_trans_alarm);
             neg_trans_alarm = None;
@@ -118,17 +132,16 @@ namespace Xidlechain {
     }
 
     GdkFilterReturn XsyncActivityDetector::gdk_event_filter(
-        GdkXEvent *gxevent, GdkEvent *gevent, gpointer data)
+        GdkXEvent *gxevent, GdkEvent *gevent)
     {
         XEvent* xevent = static_cast<XEvent*>(gxevent);
         XSyncAlarmNotifyEvent* alarm_event =
             static_cast<XSyncAlarmNotifyEvent*>(gxevent);
-        XsyncActivityDetector* _this = static_cast<XsyncActivityDetector*>(data);
         XSyncValue value;
 
-        if (xevent->type == _this->sync_event_base + XSyncAlarmNotify &&
+        if (xevent->type == sync_event_base + XSyncAlarmNotify &&
             alarm_event->state != XSyncAlarmDestroyed &&
-            XSyncQueryCounter(_this->xdisplay, _this->idle_counter_id, &value))
+            XSyncQueryCounter(xdisplay, idle_counter_id, &value))
         {
             bool is_idle = !XSyncValueLessThan(alarm_event->counter_value,
                                                alarm_event->alarm_value);
@@ -145,14 +158,26 @@ namespace Xidlechain {
             if (is_idle) {
                 g_info("Activity timeout at %ld ms", idle_time_ms);
                 event_type = EVENT_ACTIVITY_TIMEOUT;
-                user_data = _this->pos_trans_alarms[alarm_event->alarm];
+                unordered_map<XSyncAlarm, gpointer>::iterator it = pos_trans_alarms.find(alarm_event->alarm);
+                if (it == pos_trans_alarms.end()) {
+                    g_warning("Received event for deleted alarm");
+                    return GDK_FILTER_CONTINUE;
+                }
+                user_data = it->second;
             } else {
                 g_info("Activity resume at %ld ms", idle_time_ms);
                 event_type = EVENT_ACTIVITY_RESUME;
                 user_data = NULL;
             }
-            _this->event_receiver->receive(event_type, user_data);
+            event_receiver->receive(event_type, user_data);
         }
         return GDK_FILTER_CONTINUE;
+    }
+
+    GdkFilterReturn XsyncActivityDetector::static_gdk_event_filter(
+        GdkXEvent *gxevent, GdkEvent *gevent, gpointer data)
+    {
+        XsyncActivityDetector* _this = static_cast<XsyncActivityDetector*>(data);
+        return _this->gdk_event_filter(gxevent, gevent);
     }
 }

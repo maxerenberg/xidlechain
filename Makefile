@@ -1,11 +1,12 @@
 CXX = g++
-EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 xext libpulse libpulse-mainloop-glib
+EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 gudev-1.0 xext libpulse libpulse-mainloop-glib
 # don't include all the GLib headers inside the .d files
 CXXFLAGS = -Wall -MMD -std=c++17 -iquote ./ \
 	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
 LDLIBS = $(shell pkg-config --libs $(EXT_DEPS))
 COMMON_OBJECTS = event_manager.o activity_detector.o logind_manager.o \
-	audio_detector.o process_spawner.o command.o config_manager.o
+	audio_detector.o process_spawner.o command.o config_manager.o \
+	brightness_controller.o
 OBJECTS = xidlechain.o $(COMMON_OBJECTS)
 DEPENDS = ${OBJECTS:.o=.d}
 PREFIX = ~/.local
