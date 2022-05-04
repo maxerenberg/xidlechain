@@ -25,6 +25,7 @@ namespace Xidlechain {
         class Action {
         public:
             static unique_ptr<Action> factory(const char *cmd_str);
+            virtual const char *get_cmd_str() const = 0;
             // async by default
             virtual bool execute(const ActionExecutors &executors) = 0;
             virtual bool execute_sync(const ActionExecutors &executors) {
@@ -37,22 +38,26 @@ namespace Xidlechain {
             string cmd;
         public:
             ShellAction(const char *cmd);
+            const char *get_cmd_str() const override;
             bool execute(const ActionExecutors &executors) override;
             bool execute_sync(const ActionExecutors &executors) override;
         };
 
         class DimAction: public Action {
         public:
+            const char *get_cmd_str() const override;
             bool execute(const ActionExecutors &executors) override;
         };
 
         class UndimAction: public Action {
         public:
+            const char *get_cmd_str() const override;
             bool execute(const ActionExecutors &executors) override;
         };
 
         class SuspendAction: public Action {
         public:
+            const char *get_cmd_str() const override;
             bool execute(const ActionExecutors &executors) override;
         };
 
@@ -74,6 +79,7 @@ namespace Xidlechain {
         void activate(const ActionExecutors &executors, bool sync=false);
         void deactivate(const ActionExecutors &executors, bool sync=false);
         bool is_activated() const;
+        char *get_trigger_str() const;
     private:
         // Only used for TIMEOUT commands
         // We need this because when activity is detected, we need to

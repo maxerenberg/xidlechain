@@ -4,11 +4,12 @@
 #include <unordered_set>
 #include <pulse/pulseaudio.h>
 #include <pulse/glib-mainloop.h>
-#include "event_receiver.h"
 
 using std::unordered_set;
 
 namespace Xidlechain {
+    class EventReceiver;
+
     class AudioDetector {
     public:
         // Emits an AUDIO_RUNNING event when at least one sink is running,

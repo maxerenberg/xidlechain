@@ -3,7 +3,7 @@
 # xidlechain
 
 This is an idle manager for X.
-See the man page [xidlechain(1)](xidlechain.scd.1) for configuration instructions.
+See the man page [xidlechain(1)](xidlechain.1.scd) for configuration instructions.
 
 ## Installation
 

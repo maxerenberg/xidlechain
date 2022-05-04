@@ -1,6 +1,7 @@
 #include <iostream>
 #include <glib.h>
 #include "audio_detector.h"
+#include "event_receiver.h"
 
 using namespace std;
 

@@ -4,8 +4,6 @@
 #include <glib.h>
 
 namespace Xidlechain {
-    inline const char *APP_NAME = "xidlechain";
-
     enum EventType {
         EVENT_ACTIVITY_TIMEOUT = 1,
         EVENT_ACTIVITY_RESUME,

@@ -7,6 +7,7 @@
 #include "audio_detector.h"
 #include "brightness_controller.h"
 #include "config_manager.h"
+#include "dbus_request_handler.h"
 #include "event_manager.h"
 #include "logind_manager.h"
 #include "process_spawner.h"
@@ -62,12 +63,17 @@ int main(int argc, char *argv[]) {
     Xidlechain::DbusLogindManager logind_manager;
     Xidlechain::GProcessSpawner process_spawner;
     Xidlechain::DbusBrightnessController brightness_controller;
-    bool success = event_manager.init(&activity_detector,
-                                      &logind_manager,
-                                      &audio_detector,
-                                      &process_spawner,
-                                      &brightness_controller);
-    if (!success) return EXIT_FAILURE;
+    if (!event_manager.init(&activity_detector,
+                            &logind_manager,
+                            &audio_detector,
+                            &process_spawner,
+                            &brightness_controller))
+    {
+        return EXIT_FAILURE;
+    }
+
+    Xidlechain::DbusRequestHandler request_handler;
+    request_handler.init(&config_manager, &event_manager);
 
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(loop);

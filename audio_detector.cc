@@ -1,4 +1,6 @@
+#include "app.h"
 #include "audio_detector.h"
+#include "event_receiver.h"
 
 using std::pair;
 using std::unordered_set;

@@ -33,7 +33,16 @@ namespace Xidlechain {
         return make_unique<Command::ShellAction>(cmd_str);
     }
 
-    Command::ShellAction::ShellAction(const char *cmd): cmd{cmd} {}
+    Command::ShellAction::ShellAction(const char *cmd_arg): cmd{cmd_arg} {
+        if (cmd.empty()) {
+            g_warning("shell command may not be empty");
+            abort();
+        }
+    }
+
+    const char *Command::ShellAction::get_cmd_str() const {
+        return cmd.c_str();
+    }
 
     bool Command::ShellAction::execute(const Command::ActionExecutors &executors) {
         ProcessSpawner *process_spawner = executors.process_spawner;
@@ -52,10 +61,18 @@ namespace Xidlechain {
         return brightness_controller->dim();
     }
 
+    const char *Command::DimAction::get_cmd_str() const {
+        return "builtin:dim";
+    }
+
     bool Command::UndimAction::execute(const Command::ActionExecutors &executors) {
         BrightnessController *brightness_controller = executors.brightness_controller;
         brightness_controller->restore_brightness();
         return true;
+    }
+
+    const char *Command::UndimAction::get_cmd_str() const {
+        return "builtin:undim";
     }
 
     bool Command::SuspendAction::execute(const Command::ActionExecutors &executors) {
@@ -63,11 +80,29 @@ namespace Xidlechain {
         return logind_manager->suspend();
     }
 
+    const char *Command::SuspendAction::get_cmd_str() const {
+        return "builtin:suspend";
+    }
+
     Command::Command():
         trigger{NONE},
         timeout_ms{0},
         activated{false}
     {}
+
+    char *Command::get_trigger_str() const {
+        switch (trigger) {
+        case Command::TIMEOUT:
+            return g_strdup_printf("timeout %d", (int)(timeout_ms / 1000));
+        case Command::SLEEP:
+            return g_strdup("sleep");
+        case Command::LOCK:
+            return g_strdup("lock");
+        default:
+            g_critical("Trigger not set");
+            abort();
+        }
+    }
 
     void Command::activate(const Command::ActionExecutors &executors, bool sync) {
         if (trigger == TIMEOUT) {

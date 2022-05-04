@@ -1,5 +1,3 @@
-#include "logind_manager.h"
-
 #include <cstring>
 #include <fcntl.h>
 #include <unistd.h>
@@ -7,8 +5,10 @@
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
 
+#include "app.h"
 #include "defer.h"
 #include "event_receiver.h"
+#include "logind_manager.h"
 
 namespace Xidlechain {
     const char * const DbusLogindManager::BUS_NAME = "org.freedesktop.login1",
