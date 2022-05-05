@@ -61,6 +61,18 @@ namespace Xidlechain {
             bool execute(const ActionExecutors &executors) override;
         };
 
+        class SetIdleHintAction: public Action {
+        public:
+            const char *get_cmd_str() const override;
+            bool execute(const ActionExecutors &executors) override;
+        };
+
+        class UnsetIdleHintAction: public Action {
+        public:
+            const char *get_cmd_str() const override;
+            bool execute(const ActionExecutors &executors) override;
+        };
+
         enum Trigger {
             NONE,
             TIMEOUT,

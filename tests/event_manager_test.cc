@@ -224,23 +224,6 @@ static void test_audio_1(gpointer, gconstpointer user_data) {
     g_assert_cmpuint(process_spawner.async_cmds.size(), ==, 1);
 }
 
-static void test_idlehint(gpointer, gconstpointer) {
-    ConfigManager config_manager;
-    config_manager.wait_before_sleep = false;
-    config_manager.ignore_audio = false;
-    config_manager.idlehint_timeout_sec = 2;
-    EventManager event_manager(&config_manager);
-    event_manager_init(event_manager);
-    // verify that a timeout was registered
-    g_assert_cmpuint(activity_detector.cb_data.size(), ==, 1);
-    event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[0]);
-    // IdleHint should be set to true
-    g_assert_cmpint(logind_manager.idle_hint_history.at(0), ==, true);
-    event_manager.receive(EVENT_ACTIVITY_RESUME, activity_detector.cb_data[0]);
-    // IdleHint should be set to false
-    g_assert_cmpint(logind_manager.idle_hint_history.at(1), ==, false);
-}
-
 static void test_lock(gpointer, gconstpointer) {
     ConfigManager config_manager;
     config_manager.wait_before_sleep = false;
@@ -276,8 +259,6 @@ int main(int argc, char *argv[]) {
                fixture_setup, test_audio_1, NULL);
     g_test_add("/event-manager/no-ignore-audio", void, (gconstpointer)0,
                fixture_setup, test_audio_1, NULL);
-    g_test_add("/event-manager/idlehint", void, NULL,
-               fixture_setup, test_idlehint, NULL);
     g_test_add("/event-manager/lock-unlock", void, NULL,
                fixture_setup, test_lock, NULL);
 

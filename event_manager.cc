@@ -35,37 +35,13 @@ namespace Xidlechain {
         this->logind_manager = logind_manager;
         this->process_spawner = process_spawner;
         this->brightness_controller = brightness_controller;
-        if (!activity_detector->init(this)) {
-            return false;
-        }
-        if (!logind_manager->init(this)) {
-            return false;
-        }
-        if (!cfg->ignore_audio && !audio_detector->init(this)) {
-            return false;
-        }
-        if (!brightness_controller->init(logind_manager)) {
-            return false;
-        }
-        if (cfg->idlehint_is_enabled()) {
-            // Send the sentinel value so that we know it's not an index
-            // for activity_commands
-            activity_detector->add_idle_timeout(
-                (int64_t)cfg->idlehint_timeout_sec * 1000,
-                (gpointer)idlehint_sentinel
-            );
-        }
         if (cfg->disable_automatic_dpms_activation) {
             process_spawner->exec_cmd_sync("xset dpms 0 0 0");
         }
         if (cfg->disable_screensaver) {
             process_spawner->exec_cmd_sync("xset s off");
         }
-        for (Command &cmd : cfg->timeout_commands) {
-            // Send the pointer of the command so that we know later which
-            // command to activate
-            activity_detector->add_idle_timeout(cmd.timeout_ms, (gpointer)&cmd);
-        }
+        add_timeouts();
         return true;
     }
 
@@ -81,18 +57,47 @@ namespace Xidlechain {
         cmd.deactivate(get_executors(), sync);
     }
 
-    void EventManager::set_idle_hint(bool idle) {
-        if (cfg->idlehint_is_enabled()) {
-            logind_manager->set_idle_hint(idle);
+    void EventManager::add_timeouts() {
+        for (Command &cmd : cfg->timeout_commands) {
+            // Send the pointer of the command so that we know later which
+            // command to activate
+            activity_detector->add_idle_timeout(cmd.timeout_ms, &cmd);
+        }
+    }
+
+    void EventManager::clear_timeouts() {
+        activity_detector->clear_timeouts();
+    }
+
+    void EventManager::handle_config_changed_ignore_audio(const ConfigChangeInfo *cfg_info) {
+        bool old_value = g_variant_get_boolean(cfg_info->old_value);
+        bool new_value = g_variant_get_boolean(cfg_info->new_value);
+        if (old_value == new_value) {
+            // no change
+            return;
+        }
+        if (!audio_playing) {
+            // nothing to do since timeouts are always enabled
+            // if audio is not running
+            return;
+        }
+        if (new_value) {
+            // NOT IGNORE AUDIO -> IGNORE AUDIO
+            // TIMEOUTS DISABLED -> TIMEOUTS ENABLED
+            g_debug("Re-enabling timeouts because we are now ignoring audio");
+            add_timeouts();
+        } else {
+            // IGNORE AUDIO -> NOT IGNORE AUDIO
+            // TIMEOUTS ENABLED -> TIMEOUTS DISABLED
+            g_debug("Disabling timeouts because we are no longer ignoring audio");
+            clear_timeouts();
         }
     }
 
     void EventManager::receive(EventType event, gpointer data) {
         switch (event) {
         case EVENT_ACTIVITY_TIMEOUT:
-            if ((int64_t)data == idlehint_sentinel) {
-                set_idle_hint(true);
-            } else {
+            {
                 Command *cmd = (Command*)data;
                 activate(*cmd);
             }
@@ -101,7 +106,6 @@ namespace Xidlechain {
             for (Command &cmd : cfg->timeout_commands) {
                 deactivate(cmd);
             }
-            set_idle_hint(false);
             break;
         case EVENT_SLEEP:
             for (Command &cmd : cfg->sleep_commands) {
@@ -112,7 +116,6 @@ namespace Xidlechain {
             for (Command &cmd : cfg->sleep_commands) {
                 deactivate(cmd);
             }
-            set_idle_hint(false);
             break;
         case EVENT_LOCK:
             for (Command &cmd : cfg->lock_commands) {
@@ -123,28 +126,30 @@ namespace Xidlechain {
             for (Command &cmd : cfg->lock_commands) {
                 deactivate(cmd);
             }
-            set_idle_hint(false);
             break;
         case EVENT_AUDIO_RUNNING:
             if (audio_playing) {  // no change
                 break;
             }
-            g_info("Audio running, disabling timeouts");
             audio_playing = true;
-            activity_detector->clear_timeouts();
+            if (cfg->ignore_audio) {
+                g_debug("Audio running; ignoring");
+                break;
+            }
+            g_info("Audio running, disabling timeouts");
+            clear_timeouts();
             break;
         case EVENT_AUDIO_STOPPED:
             if (!audio_playing) {  // no change
                 break;
             }
-            g_info("Audio stopped, re-enabling timeouts");
             audio_playing = false;
-            // re-register all of our timeouts
-            for (Command &cmd : cfg->timeout_commands) {
-                activity_detector->add_idle_timeout(
-                    cmd.timeout_ms, (gpointer)&cmd
-                );
+            if (cfg->ignore_audio) {
+                g_debug("Audio stopped; ignoring");
+                break;
             }
+            g_info("Audio stopped, re-enabling timeouts");
+            add_timeouts();
             break;
         case EVENT_COMMAND_DELETED:
             {
@@ -156,6 +161,16 @@ namespace Xidlechain {
                 cfg->remove_command(*cmd);
             }
             break;
+        case EVENT_CONFIG_CHANGED:
+            {
+                const ConfigChangeInfo *cfg_info = (const ConfigChangeInfo*)data;
+                if (g_strcmp0(cfg_info->name, "IgnoreAudio") == 0) {
+                    handle_config_changed_ignore_audio(cfg_info);
+                }
+            }
+            break;
+        default:
+            g_warning("Received unknown event type %d", event);
         }
     }
 }

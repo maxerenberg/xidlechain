@@ -27,17 +27,32 @@ namespace Xidlechain {
         vector<Command> timeout_commands;
         vector<Command> sleep_commands;
         vector<Command> lock_commands;
+
         bool ignore_audio = false;
+        bool set_ignore_audio(bool value);
+
         bool wait_before_sleep = true;
-        int idlehint_timeout_sec = 0;
+        bool set_wait_before_sleep(bool value);
+
         bool disable_automatic_dpms_activation = true;
+        bool set_disable_automatic_dpms_activation(bool value);
+
         bool disable_screensaver = true;
+        bool set_disable_screensaver(bool value);
+
+        bool enable_dbus = true;
+        bool set_enable_dbus(bool value);
 
         bool parse_config_file(const string &filename);
-        bool idlehint_is_enabled() const;
         void add_command(Command &&cmd);
         bool find_command(const string &name, Command::Trigger trigger, Command **cmd);
         bool remove_command(Command &cmd);
+    };
+
+    struct ConfigChangeInfo {
+        const gchar *name;
+        GVariant *old_value;
+        GVariant *new_value;
     };
 }
 

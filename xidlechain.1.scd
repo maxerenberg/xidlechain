@@ -46,20 +46,17 @@ General options are placed under the *[Main]* section:
 	the option InhibitDelayMaxSec. A command that has not finished by then will
 	continue running after resuming from sleep.
 
-*idlehint_timeout* = _timeout_sec_
-	After _timeout_sec_ seconds, xidlechain will call SetIdleHint(true) on
-	the *org.freedesktop.login1(5)* session object to indicate an idle
-	session. SetIdleHint(false) will be called on resume and unlock events.
-	If _timeout_sec_ is 0, then the idle hint will never be set. The default
-	value is 0.
-
 *disable_automatic_dpms_activation* = _true_ or _false_
 	If true, automatic DPMS activation will be disabled by executing 'xset
-	dpms 0 0 0'. The default value is true.
+	dpms 0 0 0' when the program starts. The default value is true.
 
 *disable_screensaver* = _true_ or _false_
 	If true, the X11 screensaver extension will be disabled by executing
-	'xset s off'. The default value is true.
+	'xset s off' when the program starts. The default value is true.
+
+*enable_dbus* = _true_ or _false_
+	If true, the settings will be exported over a D-Bus interface at
+	io.github.maxerenberg.xidlechain. The default value is true.
 
 ## ACTION SECTIONS
 Custom actions may be specified in sections beginning with the prefix 'Action '.
@@ -107,12 +104,19 @@ will be executed with "sh -c".
 *builtin:suspend*
 	Suspend the system (i.e. "go to sleep").
 
+*builtin:set_idle_hint*
+	Call SetIdleHint(true) on the *org.freedesktop.login1(5)* session
+	object to indicate an idle session.
+
+*builtin:unset_idle_hint*
+	Call SetIdleHint(false) on the *org.freedesktop.login1(5)* session
+	object to indicate that the session is no longer idle.
+
 ## SAMPLE CONFIGURATION
 ```
 [Main]
 ignore_audio = false
 wait_before_sleep = true
-idlehint_timeout = 0
 disable_automatic_dpms_activation = true
 disable_screensaver = true
 

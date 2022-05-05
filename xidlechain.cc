@@ -63,6 +63,19 @@ int main(int argc, char *argv[]) {
     Xidlechain::DbusLogindManager logind_manager;
     Xidlechain::GProcessSpawner process_spawner;
     Xidlechain::DbusBrightnessController brightness_controller;
+    Xidlechain::DbusRequestHandler request_handler;
+    if (!activity_detector.init(&event_manager)) {
+        return EXIT_FAILURE;
+    }
+    if (!audio_detector.init(&event_manager)) {
+        return EXIT_FAILURE;
+    }
+    if (!logind_manager.init(&event_manager)) {
+        return EXIT_FAILURE;
+    }
+    if (!brightness_controller.init(&logind_manager)) {
+        return EXIT_FAILURE;
+    }
     if (!event_manager.init(&activity_detector,
                             &logind_manager,
                             &audio_detector,
@@ -71,9 +84,9 @@ int main(int argc, char *argv[]) {
     {
         return EXIT_FAILURE;
     }
-
-    Xidlechain::DbusRequestHandler request_handler;
-    request_handler.init(&config_manager, &event_manager);
+    if (config_manager.enable_dbus) {
+        request_handler.init(&config_manager, &event_manager);
+    }
 
     GMainLoop *loop = g_main_loop_new(NULL, FALSE);
     g_main_loop_run(loop);

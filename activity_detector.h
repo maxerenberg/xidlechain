@@ -57,7 +57,12 @@ namespace Xidlechain {
 
         bool init(EventReceiver *receiver) override;
 
+        // Adds a new timeout event which will be triggered after timeout_ms
+        // milliseconds. `data` will be sent to the event_receiver.
+        // WARNING: `data` must be unique for each timeout.
         bool add_idle_timeout(int64_t timeout_ms, gpointer data) override;
+        // Removes the timeout associated with `data`. If no such timeout
+        // exists, false is returned.
         bool remove_idle_timeout(gpointer data) override;
 
         bool clear_timeouts() override;

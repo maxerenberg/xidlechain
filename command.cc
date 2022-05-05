@@ -25,6 +25,10 @@ namespace Xidlechain {
                 return make_unique<Command::UndimAction>();
             } else if (g_strcmp0(cmd_str, "suspend") == 0) {
                 return make_unique<Command::SuspendAction>();
+            } else if (g_strcmp0(cmd_str, "set_idle_hint") == 0) {
+                return make_unique<Command::SetIdleHintAction>();
+            } else if (g_strcmp0(cmd_str, "unset_idle_hint") == 0) {
+                return make_unique<Command::UnsetIdleHintAction>();
             } else {
                 g_warning("Unknown builtin '%s'", cmd_str);
                 abort();
@@ -82,6 +86,24 @@ namespace Xidlechain {
 
     const char *Command::SuspendAction::get_cmd_str() const {
         return "builtin:suspend";
+    }
+
+    bool Command::SetIdleHintAction::execute(const Command::ActionExecutors &executors) {
+        LogindManager *logind_manager = executors.logind_manager;
+        return logind_manager->set_idle_hint(true);
+    }
+
+    const char *Command::SetIdleHintAction::get_cmd_str() const {
+        return "builtin:set_idle_hint";
+    }
+
+    bool Command::UnsetIdleHintAction::execute(const Command::ActionExecutors &executors) {
+        LogindManager *logind_manager = executors.logind_manager;
+        return logind_manager->set_idle_hint(false);
+    }
+
+    const char *Command::UnsetIdleHintAction::get_cmd_str() const {
+        return "builtin:unset_idle_hint";
     }
 
     Command::Command():

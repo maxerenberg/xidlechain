@@ -67,8 +67,9 @@ namespace Xidlechain {
     }
 
     bool XsyncActivityDetector::add_idle_timeout(int64_t timeout_ms, gpointer data) {
-        g_return_val_if_fail(idle_counter_id != 0, FALSE);
-        g_return_val_if_fail(timeout_ms > 1, FALSE);
+        g_assert(idle_counter_id != 0);
+        g_assert(timeout_ms > 1);
+        g_assert(pos_trans_alarms_by_data.find(data) == pos_trans_alarms_by_data.end());
 
         if (timeout_ms < min_timeout) {
             min_timeout = timeout_ms;

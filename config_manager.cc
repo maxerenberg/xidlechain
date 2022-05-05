@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "command.h"
-#include "defer.h"
 
 using std::abort;
 using std::char_traits;
@@ -17,19 +16,11 @@ using std::unique_ptr;
 using std::string;
 using Xidlechain::Command;
 
-static bool read_bool(GKeyFile *key_file, gchar *group, gchar *key, bool &result, GError *error) {
+static bool read_bool(GKeyFile *key_file, gchar *group, gchar *key, bool &result) {
+    g_autoptr(GError) error = NULL;
     result = g_key_file_get_boolean(key_file, group, key, &error);
     if (error != NULL) {
         g_warning("Could not read boolean value of %s: %s", key, error->message);
-        return false;
-    }
-    return true;
-}
-
-static bool read_int(GKeyFile *key_file, gchar *group, gchar *key, int &result, GError *error) {
-    result = g_key_file_get_integer(key_file, group, key, &error);
-    if (error != NULL) {
-        g_warning("Could not read integer value of %s: %s", key, error->message);
         return false;
     }
     return true;
@@ -100,13 +91,9 @@ namespace Xidlechain {
     bool ConfigManager::parse_action_section(GKeyFile *key_file, gchar *group) {
         static constexpr const char * const timeout_prefix = "timeout ";
         static constexpr const int timeout_prefix_len = char_traits<char>::length(timeout_prefix);
-        GError *error = NULL;
-        gchar **keys = NULL;
+        g_autoptr(GError) error = NULL;
+        g_auto(GStrv) keys = NULL;
         gchar *action_name = group + action_prefix_len;
-        Defer defer([&]{
-            if (error != NULL) g_error_free(error);
-            if (keys != NULL) g_strfreev(keys);
-        });
 
         keys = g_key_file_get_keys(key_file, group, NULL, &error);
         g_assert_nonnull(keys);
@@ -158,39 +145,47 @@ namespace Xidlechain {
     }
 
     bool ConfigManager::parse_main_section(GKeyFile *key_file, gchar *group) {
-        GError *error = NULL;
-        gchar **keys = NULL;
-        Defer defer([&]{
-            if (error != NULL) g_error_free(error);
-            if (keys != NULL) g_strfreev(keys);
-        });
+        g_autoptr(GError) error = NULL;
+        g_auto(GStrv) keys = NULL;
 
         keys = g_key_file_get_keys(key_file, group, NULL, &error);
         g_assert_nonnull(keys);
+        bool bool_value;
         for (int i = 0; keys[i] != NULL; i++) {
             gchar *key = keys[i];
             if (g_strcmp0(key, "ignore_audio") == 0) {
-                if (!read_bool(key_file, group, key, ignore_audio, error)) {
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_ignore_audio(bool_value)
+                ) {
                     return false;
                 }
             } else if (g_strcmp0(key, "wait_before_sleep") == 0) {
-                if (!read_bool(key_file, group, key, wait_before_sleep, error)) {
-                    return false;
-                }
-            } else if (g_strcmp0(key, "idlehint_timeout") == 0) {
-                if (!read_int(key_file, group, key, idlehint_timeout_sec, error)) {
-                    return false;
-                }
-                if (idlehint_timeout_sec < 0) {
-                    g_warning("idlehint_timeout must be non-negative");
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_wait_before_sleep(bool_value)
+                ) {
                     return false;
                 }
             } else if (g_strcmp0(key, "disable_automatic_dpms_activation") == 0) {
-                if (!read_bool(key_file, group, key, disable_automatic_dpms_activation, error)) {
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_disable_automatic_dpms_activation(bool_value)
+                ) {
                     return false;
                 }
             } else if (g_strcmp0(key, "disable_screensaver") == 0) {
-                if (!read_bool(key_file, group, key, disable_screensaver, error)) {
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_disable_screensaver(bool_value)
+                ) {
+                    return false;
+                }
+            } else if (g_strcmp0(key, "enable_dbus") == 0) {
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_enable_dbus(bool_value)
+                ) {
                     return false;
                 }
             } else {
@@ -201,15 +196,31 @@ namespace Xidlechain {
         return true;
     }
 
+    bool ConfigManager::set_ignore_audio(bool value) {
+        ignore_audio = value;
+        return true;
+    }
+    bool ConfigManager::set_wait_before_sleep(bool value) {
+        wait_before_sleep = value;
+        return true;
+    }
+    bool ConfigManager::set_disable_automatic_dpms_activation(bool value) {
+        disable_automatic_dpms_activation = value;
+        return true;
+    }
+    bool ConfigManager::set_disable_screensaver(bool value) {
+        disable_screensaver = value;
+        return true;
+    }
+    bool ConfigManager::set_enable_dbus(bool value) {
+        enable_dbus = value;
+        return true;
+    }
+
     bool ConfigManager::parse_config_file(const string &filename) {
-        GKeyFile *key_file = NULL;
-        GError *error = NULL;
-        gchar **groups = NULL;
-        Defer defer([&]{
-            if (key_file != NULL) g_key_file_free(key_file);
-            if (error != NULL) g_error_free(error);
-            if (groups != NULL) g_strfreev(groups);
-        });
+        g_autoptr(GKeyFile) key_file = NULL;
+        g_autoptr(GError) error = NULL;
+        g_auto(GStrv) groups = NULL;
 
         key_file = g_key_file_new();
         string config_file_path;
@@ -248,9 +259,5 @@ namespace Xidlechain {
             }
         }
         return true;
-    }
-
-    bool ConfigManager::idlehint_is_enabled() const {
-        return idlehint_timeout_sec > 0;
     }
 }

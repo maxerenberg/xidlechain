@@ -18,6 +18,7 @@ namespace Xidlechain {
     class LogindManager;
     class AudioDetector;
     class ProcessSpawner;
+    struct ConfigChangeInfo;
 
     class EventManager: public EventReceiver {
         bool audio_playing;
@@ -26,13 +27,13 @@ namespace Xidlechain {
         LogindManager *logind_manager;
         ProcessSpawner *process_spawner;
         BrightnessController *brightness_controller;
-        // Sentinel value to indicate that we need to activate the idle hint.
-        static const int64_t idlehint_sentinel = -1;
 
         Command::ActionExecutors get_executors() const;
+        void clear_timeouts();
+        void add_timeouts();
         void activate(Command &cmd, bool sync=false);
         void deactivate(Command &cmd, bool sync=false);
-        void set_idle_hint(bool idle);
+        void handle_config_changed_ignore_audio(const ConfigChangeInfo *cfg_info);
     public:
         EventManager(ConfigManager *cfg);
         // Crude dependency injection.

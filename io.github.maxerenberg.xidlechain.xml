@@ -4,7 +4,6 @@
   <interface name="io.github.maxerenberg.xidlechain">
     <property name="IgnoreAudio" type="b" access="readwrite"/>
     <property name="WaitBeforeSleep" type="b" access="readwrite"/>
-    <property name="IdleHintTimeoutSec" type="i" access="readwrite"/>
     <property name="DisableAutomaticDPMSActivation" type="b" access="readwrite"/>
     <property name="DisableScreensaver" type="b" access="readwrite"/>
   </interface>
