@@ -14,6 +14,7 @@ namespace Xidlechain {
         EVENT_AUDIO_RUNNING,
         EVENT_AUDIO_STOPPED,
         EVENT_CONFIG_CHANGED,
+        EVENT_COMMAND_CHANGED,
         EVENT_COMMAND_DELETED,
     };
 

@@ -4,6 +4,7 @@
 
 #include "brightness_controller.h"
 #include "command.h"
+#include "errors.h"
 #include "logind_manager.h"
 #include "process_spawner.h"
 
@@ -14,9 +15,13 @@ using std::string;
 using std::unique_ptr;
 
 namespace Xidlechain {
-    unique_ptr<Command::Action> Command::Action::factory(const char *cmd_str) {
+    unique_ptr<Command::Action> Command::Action::factory(const char *cmd_str, GError **error) {
         static constexpr const char * const builtin_cmd_prefix = "builtin:";
         static constexpr const int builtin_cmd_prefix_len = char_traits<char>::length(builtin_cmd_prefix);
+        if (cmd_str[0] == '\0') {
+            // empty string
+            return unique_ptr<Command::Action>(nullptr);
+        }
         if (g_str_has_prefix(cmd_str, builtin_cmd_prefix)) {
             cmd_str = cmd_str + builtin_cmd_prefix_len;
             if (g_strcmp0(cmd_str, "dim") == 0) {
@@ -30,8 +35,10 @@ namespace Xidlechain {
             } else if (g_strcmp0(cmd_str, "unset_idle_hint") == 0) {
                 return make_unique<Command::UnsetIdleHintAction>();
             } else {
-                g_warning("Unknown builtin '%s'", cmd_str);
-                abort();
+                if (error) {
+                    *error = g_error_new(XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_ACTION, "Unknown builtin '%s'", cmd_str);
+                }
+                return unique_ptr<Command::Action>(nullptr);
             }
         }
         return make_unique<Command::ShellAction>(cmd_str);
@@ -114,11 +121,11 @@ namespace Xidlechain {
 
     char *Command::get_trigger_str() const {
         switch (trigger) {
-        case Command::TIMEOUT:
+        case TIMEOUT:
             return g_strdup_printf("timeout %d", (int)(timeout_ms / 1000));
-        case Command::SLEEP:
+        case SLEEP:
             return g_strdup("sleep");
-        case Command::LOCK:
+        case LOCK:
             return g_strdup("lock");
         default:
             g_critical("Trigger not set");

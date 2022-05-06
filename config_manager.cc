@@ -32,11 +32,20 @@ static bool read_int_from_string(const char *s, int &result) {
     return !iss.fail();
 }
 
+// Returns null iff val is invalid or empty.
+static unique_ptr<Command::Action> get_action(const char *val) {
+    g_autoptr(GError) error = NULL;
+    unique_ptr<Command::Action> action = Command::Action::factory(val, &error);
+    if (error) {
+        g_warning("Invalid action value '%s': %s", val, error->message);
+    }
+    return action;
+}
+
 static unique_ptr<Command::Action> read_action(GKeyFile *key_file, gchar *group, gchar *key) {
-    GError *error = NULL;
-    g_autofree gchar *val = g_key_file_get_value(key_file, group, key, &error);
+    g_autofree gchar *val = g_key_file_get_value(key_file, group, key, NULL);
     g_assert_nonnull(val);
-    return Command::Action::factory(val);
+    return get_action(val);
 }
 
 namespace Xidlechain {
@@ -88,45 +97,73 @@ namespace Xidlechain {
         return remove_command_from_list(list_for(cmd.trigger), cmd);
     }
 
-    bool ConfigManager::parse_action_section(GKeyFile *key_file, gchar *group) {
+    bool ConfigManager::set_command_name(Command &cmd, const char *val) {
+        cmd.name = string(val);
+        return true;
+    }
+
+    bool ConfigManager::set_command_trigger(Command &cmd, const char *val) {
         static constexpr const char * const timeout_prefix = "timeout ";
         static constexpr const int timeout_prefix_len = char_traits<char>::length(timeout_prefix);
-        g_autoptr(GError) error = NULL;
+
+        if (g_str_has_prefix(val, timeout_prefix)) {
+            int timeout_sec;
+            if (!read_int_from_string(val + timeout_prefix_len, timeout_sec)) {
+                g_warning("Timeout value for action %s must be an integer", cmd.name.c_str());
+                return false;
+            }
+            if (timeout_sec <= 0) {
+                g_warning("Timeout for action %s must be positive", cmd.name.c_str());
+                return false;
+            }
+            cmd.trigger = Command::TIMEOUT;
+            cmd.timeout_ms = (int64_t)timeout_sec * 1000;
+        } else if (g_strcmp0(val, "sleep") == 0) {
+            cmd.trigger = Command::SLEEP;
+        } else if (g_strcmp0(val, "lock") == 0) {
+            cmd.trigger = Command::LOCK;
+        } else {
+            g_warning("Unrecognized trigger type '%s' for action '%s'", val, cmd.name.c_str());
+            return false;
+        }
+        return true;
+    }
+
+    bool ConfigManager::set_command_activation_action(Command &cmd, const char *val) {
+        unique_ptr<Command::Action> action = get_action(val);
+        if (!action && *val) return false;
+        cmd.activation_action = std::move(action);
+        return true;
+    }
+
+    bool ConfigManager::set_command_deactivation_action(Command &cmd, const char *val) {
+        unique_ptr<Command::Action> action = get_action(val);
+        if (!action && *val) return false;
+        cmd.deactivation_action = std::move(action);
+        return true;
+    }
+
+    bool ConfigManager::parse_action_section(GKeyFile *key_file, gchar *group) {
         g_auto(GStrv) keys = NULL;
         gchar *action_name = group + action_prefix_len;
 
-        keys = g_key_file_get_keys(key_file, group, NULL, &error);
+        keys = g_key_file_get_keys(key_file, group, NULL, NULL);
         g_assert_nonnull(keys);
         Command cmd;
-        cmd.name = string(action_name);
+        set_command_name(cmd, action_name);
         for (int i = 0; keys[i] != NULL; i++) {
             gchar *key = keys[i];
             if (g_strcmp0(key, "trigger") == 0) {
-                gchar *val = g_key_file_get_value(key_file, group, key, &error);
-                if (g_str_has_prefix(val, timeout_prefix)) {
-                    int timeout_sec;
-                    if (!read_int_from_string(val + timeout_prefix_len, timeout_sec)) {
-                        g_warning("Timeout value for action %s must be an integer", action_name);
-                        return false;
-                    }
-                    if (timeout_sec <= 0) {
-                        g_warning("Timeout for action %s must be positive", action_name);
-                        return false;
-                    }
-                    cmd.trigger = Command::TIMEOUT;
-                    cmd.timeout_ms = (int64_t)timeout_sec * 1000;
-                } else if (g_strcmp0(val, "sleep") == 0) {
-                    cmd.trigger = Command::SLEEP;
-                } else if (g_strcmp0(val, "lock") == 0) {
-                    cmd.trigger = Command::LOCK;
-                } else {
-                    g_warning("Unrecognized trigger type '%s' for action '%s'", val, action_name);
+                gchar *val = g_key_file_get_value(key_file, group, key, NULL);
+                if (!set_command_trigger(cmd, val)) {
                     return false;
                 }
             } else if (g_strcmp0(key, "exec") == 0) {
                 cmd.activation_action = read_action(key_file, group, key);
+                if (!cmd.activation_action) return false;
             } else if (g_strcmp0(key, "resume_exec") == 0) {
                 cmd.deactivation_action = read_action(key_file, group, key);
+                if (!cmd.deactivation_action) return false;
             } else {
                 g_warning("Unrecognized key '%s' in section %s", key, group);
                 return false;
@@ -218,13 +255,15 @@ namespace Xidlechain {
     }
 
     bool ConfigManager::parse_config_file(const string &filename) {
+        static const GKeyFileFlags key_file_flags = G_KEY_FILE_KEEP_COMMENTS;
+
         g_autoptr(GKeyFile) key_file = NULL;
         g_autoptr(GError) error = NULL;
         g_auto(GStrv) groups = NULL;
 
         key_file = g_key_file_new();
         string config_file_path;
-        if (filename == "") {
+        if (filename.empty()) {
             // TODO: check XDG_CONFIG_HOME
             char *home = getenv("HOME");
             if (home == NULL) {

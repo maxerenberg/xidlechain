@@ -127,8 +127,8 @@ static Command make_command(
 ) {
     Command cmd;
     cmd.trigger = trigger;
-    cmd.activation_action = Command::Action::factory(exec);
-    cmd.deactivation_action = Command::Action::factory(resume_exec);
+    cmd.activation_action = Command::Action::factory(exec, NULL);
+    cmd.deactivation_action = Command::Action::factory(resume_exec, NULL);
     cmd.timeout_ms = timeout_ms;
     return cmd;
 }

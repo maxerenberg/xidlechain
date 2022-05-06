@@ -16,7 +16,6 @@ using std::vector;
 
 namespace Xidlechain {
     class ConfigManager {
-        static const GKeyFileFlags key_file_flags = G_KEY_FILE_KEEP_COMMENTS;
         static constexpr const char *action_prefix = "Action ";
         static constexpr const int action_prefix_len = char_traits<char>::length(action_prefix);
 
@@ -44,6 +43,10 @@ namespace Xidlechain {
         bool set_enable_dbus(bool value);
 
         bool parse_config_file(const string &filename);
+        bool set_command_name(Command &cmd, const char *val);
+        bool set_command_trigger(Command &cmd, const char *val);
+        bool set_command_activation_action(Command &cmd, const char *val);
+        bool set_command_deactivation_action(Command &cmd, const char *val);
         void add_command(Command &&cmd);
         bool find_command(const string &name, Command::Trigger trigger, Command **cmd);
         bool remove_command(Command &cmd);
@@ -52,7 +55,9 @@ namespace Xidlechain {
     struct ConfigChangeInfo {
         const gchar *name;
         GVariant *old_value;
-        GVariant *new_value;
+    };
+    struct CommandChangeInfo: public ConfigChangeInfo {
+        Command *cmd;
     };
 }
 

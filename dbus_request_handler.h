@@ -40,6 +40,22 @@ namespace Xidlechain {
             GVariant *value,
             GError **error
         );
+        static gboolean static_set_property_func_for_action(
+            GDBusConnection *connection,
+            const gchar *sender,
+            const gchar *object_path,
+            const gchar *interface_name,
+            const gchar *property_name,
+            GVariant *value,
+            GError **error,
+            gpointer user_data
+        );
+        gboolean handle_set_property_for_action(
+            const gchar *object_path,
+            const gchar *property_name,
+            GVariant *value,
+            GError **error
+        );
         static void static_on_bus_acquired(
             GDBusConnection *connection,
             const gchar *name,

@@ -19,6 +19,7 @@ namespace Xidlechain {
     class AudioDetector;
     class ProcessSpawner;
     struct ConfigChangeInfo;
+    struct CommandChangeInfo;
 
     class EventManager: public EventReceiver {
         bool audio_playing;
@@ -33,7 +34,8 @@ namespace Xidlechain {
         void add_timeouts();
         void activate(Command &cmd, bool sync=false);
         void deactivate(Command &cmd, bool sync=false);
-        void handle_config_changed_ignore_audio(const ConfigChangeInfo *cfg_info);
+        void handle_config_ignore_audio_changed(const ConfigChangeInfo *cfg_info);
+        void handle_command_trigger_changed(const CommandChangeInfo *info);
     public:
         EventManager(ConfigManager *cfg);
         // Crude dependency injection.

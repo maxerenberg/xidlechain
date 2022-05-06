@@ -69,9 +69,9 @@ namespace Xidlechain {
         activity_detector->clear_timeouts();
     }
 
-    void EventManager::handle_config_changed_ignore_audio(const ConfigChangeInfo *cfg_info) {
+    void EventManager::handle_config_ignore_audio_changed(const ConfigChangeInfo *cfg_info) {
         bool old_value = g_variant_get_boolean(cfg_info->old_value);
-        bool new_value = g_variant_get_boolean(cfg_info->new_value);
+        bool new_value = cfg->ignore_audio;
         if (old_value == new_value) {
             // no change
             return;
@@ -91,6 +91,21 @@ namespace Xidlechain {
             // TIMEOUTS ENABLED -> TIMEOUTS DISABLED
             g_debug("Disabling timeouts because we are no longer ignoring audio");
             clear_timeouts();
+        }
+    }
+
+    void EventManager::handle_command_trigger_changed(const CommandChangeInfo *info) {
+        Command *cmd = info->cmd;
+        Command::Trigger old_trigger = (Command::Trigger) g_variant_get_int32(info->old_value);
+        Command::Trigger new_trigger = cmd->trigger;
+
+        if (old_trigger == Command::Trigger::TIMEOUT) {
+            g_debug("Removing old timeout for '%s'", cmd->name.c_str());
+            activity_detector->remove_idle_timeout(cmd);
+        }
+        if (new_trigger == Command::Trigger::TIMEOUT) {
+            g_debug("Adding new timeout for '%s'", cmd->name.c_str());
+            activity_detector->add_idle_timeout(cmd->timeout_ms, cmd);
         }
     }
 
@@ -165,7 +180,15 @@ namespace Xidlechain {
             {
                 const ConfigChangeInfo *cfg_info = (const ConfigChangeInfo*)data;
                 if (g_strcmp0(cfg_info->name, "IgnoreAudio") == 0) {
-                    handle_config_changed_ignore_audio(cfg_info);
+                    handle_config_ignore_audio_changed(cfg_info);
+                }
+            }
+            break;
+        case EVENT_COMMAND_CHANGED:
+            {
+                const CommandChangeInfo *info = (const CommandChangeInfo*)data;
+                if (g_strcmp0(info->name, "Trigger") == 0) {
+                    handle_command_trigger_changed(info);
                 }
             }
             break;

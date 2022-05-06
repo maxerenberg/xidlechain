@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include <glib.h>
+
 using std::int64_t;
 using std::string;
 using std::unique_ptr;
@@ -24,7 +26,11 @@ namespace Xidlechain {
 
         class Action {
         public:
-            static unique_ptr<Action> factory(const char *cmd_str);
+            // If cmd_str is empty, null is returned and error is not set.
+            // If cmd_str is invalid, null is returned and error is set.
+            // Otherwise, a valid Action pointer is returned and error is
+            // not set.
+            static unique_ptr<Action> factory(const char *cmd_str, GError **error);
             virtual const char *get_cmd_str() const = 0;
             // async by default
             virtual bool execute(const ActionExecutors &executors) = 0;
