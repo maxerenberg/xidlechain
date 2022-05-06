@@ -1,15 +1,17 @@
 #ifndef _DBUS_REQUEST_HANDLER_H_
 #define _DBUS_REQUEST_HANDLER_H_
 
-#include <unordered_map>
+#include <memory>
 #include <vector>
 
 #include <gio/gio.h>
 
 #include "command.h"
 
-using std::unordered_map;
+using std::shared_ptr;
 using std::vector;
+
+struct _CXidlechain;
 
 namespace Xidlechain {
     class ConfigManager;
@@ -19,7 +21,7 @@ namespace Xidlechain {
         ConfigManager *cfg = nullptr;
         EventReceiver *event_receiver = nullptr;
         guint bus_identifier = 0;
-        unordered_map<int, Command*> action_id_to_command;
+        GDBusObjectManagerServer *object_manager = nullptr;
         // There'll only be one instance of this class for the lifetime
         // of the program
         static DbusRequestHandler *INSTANCE;
@@ -56,6 +58,35 @@ namespace Xidlechain {
             GVariant *value,
             GError **error
         );
+        static gboolean static_on_add_action(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            const gchar *name,
+            const gchar *trigger,
+            const gchar *exec,
+            const gchar *resume_exec,
+            gpointer user_data
+        );
+        void on_add_action(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            const gchar *name,
+            const gchar *trigger,
+            const gchar *exec,
+            const gchar *resume_exec
+        );
+        static gboolean static_on_remove_action(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            gint id,
+            gpointer user_data
+        );
+        void on_remove_action(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            gint id
+        );
+
         static void static_on_bus_acquired(
             GDBusConnection *connection,
             const gchar *name,
@@ -75,7 +106,8 @@ namespace Xidlechain {
             const gchar *name,
             gpointer user_data
         );
-        void add_action_objects_from_list(GDBusObjectManagerServer *manager, vector<Command> &list);
+        void add_actions_to_object_manager(vector<shared_ptr<Command>> &list);
+        void add_action_to_object_manager(Command &cmd);
     public:
         void init(
             ConfigManager *config_manager,

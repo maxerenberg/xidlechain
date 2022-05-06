@@ -6,5 +6,17 @@
     <property name="WaitBeforeSleep" type="b" access="readwrite"/>
     <property name="DisableAutomaticDPMSActivation" type="b" access="readwrite"/>
     <property name="DisableScreensaver" type="b" access="readwrite"/>
+
+    <method name="AddAction">
+      <arg direction="in" type="s" name="name"/>
+      <arg direction="in" type="s" name="trigger"/>
+      <arg direction="in" type="s" name="exec"/>
+      <arg direction="in" type="s" name="resume_exec"/>
+      <arg direction="out" type="i" name="id"/>
+    </method>
+
+    <method name="RemoveAction">
+      <arg direction="in" type="i" name="id"/>
+    </method>
   </interface>
 </node>

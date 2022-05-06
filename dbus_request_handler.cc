@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 #include <gio/gio.h>
@@ -12,6 +13,7 @@
 #include "xidlechain_generated.h"
 
 using std::abort;
+using std::make_shared;
 using std::memcpy;
 using std::sscanf;
 using std::vector;
@@ -187,13 +189,12 @@ namespace Xidlechain {
             g_set_error(error, G_DBUS_ERROR, G_DBUS_ERROR_FAILED, "Internal error: could not parse action ID");
             return FALSE;
         }
-        unordered_map<int, Command*>::iterator it = action_id_to_command.find(action_id);
-        if (it == action_id_to_command.end()) {
+        shared_ptr<Command> cmd = cfg->lookup_command(action_id);
+        if (!cmd) {
             g_warning("Action ID not found: %d", action_id);
             g_set_error(error, G_DBUS_ERROR, G_DBUS_ERROR_FAILED, "Internal error: could not find action ID");
             return FALSE;
         }
-        Command *cmd = it->second;
         bool success = false;
         CommandChangeInfo info;
         info.cmd = cmd;
@@ -238,6 +239,85 @@ namespace Xidlechain {
         return TRUE;
     }
 
+    gboolean DbusRequestHandler::static_on_add_action(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        const gchar *name,
+        const gchar *trigger,
+        const gchar *exec,
+        const gchar *resume_exec,
+        gpointer user_data
+    ) {
+        g_debug("Adding new command '%s'", name);
+        DbusRequestHandler *_this = (DbusRequestHandler*)user_data;
+        _this->on_add_action(object, invocation, name, trigger, exec, resume_exec);
+        return TRUE;
+    }
+
+    void DbusRequestHandler::on_add_action(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        const gchar *name,
+        const gchar *trigger,
+        const gchar *exec,
+        const gchar *resume_exec
+    ) {
+        shared_ptr<Command> cmd = make_shared<Command>();
+        if (!cfg->set_command_name(*cmd, name)) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid name");
+            return;
+        }
+        if (!cfg->set_command_trigger(*cmd, trigger)) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid trigger");
+            return;
+        }
+        if (!cfg->set_command_activation_action(*cmd, exec)) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid activation action");
+            return;
+        }
+        if (!cfg->set_command_deactivation_action(*cmd, resume_exec)) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid deactivation action");
+            return;
+        }
+        int id = cfg->add_command(cmd);
+        event_receiver->receive(EVENT_COMMAND_ADDED, (gpointer)(long)id);
+
+        add_action_to_object_manager(*cmd);
+        c_xidlechain_complete_add_action(object, invocation, id);
+    }
+
+    gboolean DbusRequestHandler::static_on_remove_action(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        gint id,
+        gpointer user_data
+    ) {
+        g_debug("Removing command with ID %d", id);
+        DbusRequestHandler *_this = (DbusRequestHandler*)user_data;
+        _this->on_remove_action(object, invocation, id);
+        return TRUE;
+    }
+
+    void DbusRequestHandler::on_remove_action(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        gint id
+    ) {
+        shared_ptr<Command> cmd = cfg->lookup_command(id);
+        if (!cmd) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "Internal error: could not find command");
+            return;
+        }
+        cfg->remove_command(id);
+        RemovedCommandInfo info = {id, cmd->trigger};
+        event_receiver->receive(EVENT_COMMAND_REMOVED, &info);
+        g_autofree gchar *path = g_strdup_printf("%s/action/%d", DBUS_OBJECT_BASE_PATH, id);
+        if (!g_dbus_object_manager_server_unexport(object_manager, path)) {
+            g_warning("Command %d was not removed", id);
+        }
+        c_xidlechain_complete_remove_action(object, invocation);
+    }
+
     void DbusRequestHandler::on_bus_acquired(
         GDBusConnection *connection,
         const gchar *name
@@ -260,16 +340,26 @@ namespace Xidlechain {
             g_object_unref(config_iface);
             return;
         }
-        // config_iface doesn't get unref'd
 
         // Export each of the [Action ...] sections as separate objects
         g_autofree gchar *object_manager_path = g_strdup_printf("%s/action", DBUS_OBJECT_BASE_PATH);
-        GDBusObjectManagerServer *manager = g_dbus_object_manager_server_new(object_manager_path);
-        add_action_objects_from_list(manager, cfg->timeout_commands);
-        add_action_objects_from_list(manager, cfg->sleep_commands);
-        add_action_objects_from_list(manager, cfg->lock_commands);
-        g_dbus_object_manager_server_set_connection(manager, connection);
-        // manager doesn't get unref'd
+        object_manager = g_dbus_object_manager_server_new(object_manager_path);
+        add_actions_to_object_manager(cfg->timeout_commands);
+        add_actions_to_object_manager(cfg->sleep_commands);
+        add_actions_to_object_manager(cfg->lock_commands);
+        g_dbus_object_manager_server_set_connection(object_manager, connection);
+
+        // Add handlers for the methods
+        g_signal_connect(config_iface,
+                         "handle-add-action",
+                         G_CALLBACK(static_on_add_action),
+                         this);
+        g_signal_connect(config_iface,
+                         "handle-remove-action",
+                         G_CALLBACK(static_on_remove_action),
+                         this);
+
+        // config_iface doesn't get unref'd (LEAK)
     }
 
     void DbusRequestHandler::static_on_bus_acquired(
@@ -303,32 +393,33 @@ namespace Xidlechain {
         g_debug("Acquired name %s", name);
     }
 
-    void DbusRequestHandler::add_action_objects_from_list(GDBusObjectManagerServer *manager, vector<Command> &list) {
-        static int counter = 0;
+    void DbusRequestHandler::add_action_to_object_manager(Command &cmd) {
+        g_assert(cmd.id != 0);
         // An object called 'Action' on the DBus interface is actually
         // called 'Command' in our code.
         // Maybe we should rename this...
-        for (Command &cmd : list) {
-            int id = ++counter;
-            gchar *object_path = g_strdup_printf("%s/action/%d", DBUS_OBJECT_BASE_PATH, id);
-            CObjectSkeleton *object = c_object_skeleton_new(object_path);
-            g_free(object_path);
-            CXidlechainAction *action = c_xidlechain_action_skeleton_new();
-            VTableReplacer<CXidlechainAction>::replace_set_property_method(action, static_set_property_func_for_action);
-            c_xidlechain_action_set_name(action, cmd.name.c_str());
-            g_autofree gchar *trigger = cmd.get_trigger_str();
-            c_xidlechain_action_set_trigger(action, trigger);
-            if (cmd.activation_action) {
-                c_xidlechain_action_set_exec(action, cmd.activation_action->get_cmd_str());
-            }
-            if (cmd.deactivation_action) {
-                c_xidlechain_action_set_resume_exec(action, cmd.deactivation_action->get_cmd_str());
-            }
-            c_object_skeleton_set_xidlechain_action(object, action);
-            g_object_unref(action);
-            g_dbus_object_manager_server_export(manager, G_DBUS_OBJECT_SKELETON(object));
-            g_object_unref(object);
-            action_id_to_command[id] = &cmd;
+        g_autofree gchar *object_path = g_strdup_printf("%s/action/%d", DBUS_OBJECT_BASE_PATH, cmd.id);
+        CObjectSkeleton *object = c_object_skeleton_new(object_path);
+        CXidlechainAction *action = c_xidlechain_action_skeleton_new();
+        VTableReplacer<CXidlechainAction>::replace_set_property_method(action, static_set_property_func_for_action);
+        c_xidlechain_action_set_name(action, cmd.name.c_str());
+        g_autofree gchar *trigger = cmd.get_trigger_str();
+        c_xidlechain_action_set_trigger(action, trigger);
+        if (cmd.activation_action) {
+            c_xidlechain_action_set_exec(action, cmd.activation_action->get_cmd_str());
+        }
+        if (cmd.deactivation_action) {
+            c_xidlechain_action_set_resume_exec(action, cmd.deactivation_action->get_cmd_str());
+        }
+        c_object_skeleton_set_xidlechain_action(object, action);
+        g_object_unref(action);
+        g_dbus_object_manager_server_export(object_manager, G_DBUS_OBJECT_SKELETON(object));
+        g_object_unref(object);
+    }
+
+    void DbusRequestHandler::add_actions_to_object_manager(vector<shared_ptr<Command>> &list) {
+        for (shared_ptr<Command> &cmd : list) {
+            add_action_to_object_manager(*cmd);
         }
     }
 

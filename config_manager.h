@@ -3,6 +3,7 @@
 
 #include <string>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <glib.h>
@@ -11,7 +12,9 @@
 
 using std::char_traits;
 using std::string;
+using std::shared_ptr;
 using std::unique_ptr;
+using std::unordered_map;
 using std::vector;
 
 namespace Xidlechain {
@@ -19,13 +22,20 @@ namespace Xidlechain {
         static constexpr const char *action_prefix = "Action ";
         static constexpr const int action_prefix_len = char_traits<char>::length(action_prefix);
 
+        unordered_map<int, shared_ptr<Command>> id_to_command;
+        int command_id_counter = 0;
+
         bool parse_main_section(GKeyFile *key_file, gchar *group);
         bool parse_action_section(GKeyFile *key_file, gchar *group);
-        vector<Command>& list_for(Command::Trigger trigger);
+        vector<shared_ptr<Command>>& list_for(Command::Trigger trigger);
     public:
-        vector<Command> timeout_commands;
-        vector<Command> sleep_commands;
-        vector<Command> lock_commands;
+        // We need to store pointers in the vectors because we actually
+        // store the pointers in other places too, and we can't
+        // keep a pointer to a vector entry's slot (will disappear when
+        // the vector reallocates memory)
+        vector<shared_ptr<Command>> timeout_commands;
+        vector<shared_ptr<Command>> sleep_commands;
+        vector<shared_ptr<Command>> lock_commands;
 
         bool ignore_audio = false;
         bool set_ignore_audio(bool value);
@@ -43,13 +53,14 @@ namespace Xidlechain {
         bool set_enable_dbus(bool value);
 
         bool parse_config_file(const string &filename);
+        shared_ptr<Command> lookup_command(int cmd_id);
         bool set_command_name(Command &cmd, const char *val);
         bool set_command_trigger(Command &cmd, const char *val);
         bool set_command_activation_action(Command &cmd, const char *val);
         bool set_command_deactivation_action(Command &cmd, const char *val);
-        void add_command(Command &&cmd);
-        bool find_command(const string &name, Command::Trigger trigger, Command **cmd);
-        bool remove_command(Command &cmd);
+        int add_command(unique_ptr<Command> &&cmd);
+        int add_command(shared_ptr<Command> cmd);
+        bool remove_command(int cmd_id);
     };
 
     struct ConfigChangeInfo {
@@ -57,7 +68,11 @@ namespace Xidlechain {
         GVariant *old_value;
     };
     struct CommandChangeInfo: public ConfigChangeInfo {
-        Command *cmd;
+        shared_ptr<Command> cmd;
+    };
+    struct RemovedCommandInfo {
+        int id;
+        Command::Trigger trigger;
     };
 }
 

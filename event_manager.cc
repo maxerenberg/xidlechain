@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstdint>
 #include <sys/wait.h>
 #include <unistd.h>
 #include "activity_detector.h"
@@ -8,6 +9,8 @@
 #include "event_manager.h"
 #include "logind_manager.h"
 #include "process_spawner.h"
+
+using std::uintptr_t;
 
 namespace Xidlechain {
     EventManager::EventManager(ConfigManager *cfg):
@@ -58,10 +61,8 @@ namespace Xidlechain {
     }
 
     void EventManager::add_timeouts() {
-        for (Command &cmd : cfg->timeout_commands) {
-            // Send the pointer of the command so that we know later which
-            // command to activate
-            activity_detector->add_idle_timeout(cmd.timeout_ms, &cmd);
+        for (shared_ptr<Command> &cmd : cfg->timeout_commands) {
+            activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
         }
     }
 
@@ -69,8 +70,8 @@ namespace Xidlechain {
         activity_detector->clear_timeouts();
     }
 
-    void EventManager::handle_config_ignore_audio_changed(const ConfigChangeInfo *cfg_info) {
-        bool old_value = g_variant_get_boolean(cfg_info->old_value);
+    void EventManager::handle_config_ignore_audio_changed(const ConfigChangeInfo *info) {
+        bool old_value = g_variant_get_boolean(info->old_value);
         bool new_value = cfg->ignore_audio;
         if (old_value == new_value) {
             // no change
@@ -95,17 +96,17 @@ namespace Xidlechain {
     }
 
     void EventManager::handle_command_trigger_changed(const CommandChangeInfo *info) {
-        Command *cmd = info->cmd;
+        shared_ptr<Command> cmd = info->cmd;
         Command::Trigger old_trigger = (Command::Trigger) g_variant_get_int32(info->old_value);
         Command::Trigger new_trigger = cmd->trigger;
 
         if (old_trigger == Command::Trigger::TIMEOUT) {
             g_debug("Removing old timeout for '%s'", cmd->name.c_str());
-            activity_detector->remove_idle_timeout(cmd);
+            activity_detector->remove_idle_timeout((gpointer)(long)cmd->id);
         }
         if (new_trigger == Command::Trigger::TIMEOUT) {
             g_debug("Adding new timeout for '%s'", cmd->name.c_str());
-            activity_detector->add_idle_timeout(cmd->timeout_ms, cmd);
+            activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
         }
     }
 
@@ -113,33 +114,33 @@ namespace Xidlechain {
         switch (event) {
         case EVENT_ACTIVITY_TIMEOUT:
             {
-                Command *cmd = (Command*)data;
+                shared_ptr<Command> cmd = cfg->lookup_command((uintptr_t)data);
                 activate(*cmd);
             }
             break;
         case EVENT_ACTIVITY_RESUME:
-            for (Command &cmd : cfg->timeout_commands) {
-                deactivate(cmd);
+            for (shared_ptr<Command> &cmd : cfg->timeout_commands) {
+                deactivate(*cmd);
             }
             break;
         case EVENT_SLEEP:
-            for (Command &cmd : cfg->sleep_commands) {
-                activate(cmd, cfg->wait_before_sleep);
+            for (shared_ptr<Command> &cmd : cfg->sleep_commands) {
+                activate(*cmd, cfg->wait_before_sleep);
             }
             break;
         case EVENT_WAKE:
-            for (Command &cmd : cfg->sleep_commands) {
-                deactivate(cmd);
+            for (shared_ptr<Command> &cmd : cfg->sleep_commands) {
+                deactivate(*cmd);
             }
             break;
         case EVENT_LOCK:
-            for (Command &cmd : cfg->lock_commands) {
-                activate(cmd);
+            for (shared_ptr<Command> &cmd : cfg->lock_commands) {
+                activate(*cmd);
             }
             break;
         case EVENT_UNLOCK:
-            for (Command &cmd : cfg->lock_commands) {
-                deactivate(cmd);
+            for (shared_ptr<Command> &cmd : cfg->lock_commands) {
+                deactivate(*cmd);
             }
             break;
         case EVENT_AUDIO_RUNNING:
@@ -166,21 +167,11 @@ namespace Xidlechain {
             g_info("Audio stopped, re-enabling timeouts");
             add_timeouts();
             break;
-        case EVENT_COMMAND_DELETED:
-            {
-                Command *cmd = (Command*)data;
-                g_debug("Removing command '%s'", cmd->name.c_str());
-                if (cmd->trigger == Command::TIMEOUT) {
-                    activity_detector->remove_idle_timeout(cmd);
-                }
-                cfg->remove_command(*cmd);
-            }
-            break;
         case EVENT_CONFIG_CHANGED:
             {
-                const ConfigChangeInfo *cfg_info = (const ConfigChangeInfo*)data;
-                if (g_strcmp0(cfg_info->name, "IgnoreAudio") == 0) {
-                    handle_config_ignore_audio_changed(cfg_info);
+                const ConfigChangeInfo *info = (const ConfigChangeInfo*)data;
+                if (g_strcmp0(info->name, "IgnoreAudio") == 0) {
+                    handle_config_ignore_audio_changed(info);
                 }
             }
             break;
@@ -189,6 +180,22 @@ namespace Xidlechain {
                 const CommandChangeInfo *info = (const CommandChangeInfo*)data;
                 if (g_strcmp0(info->name, "Trigger") == 0) {
                     handle_command_trigger_changed(info);
+                }
+            }
+            break;
+        case EVENT_COMMAND_ADDED:
+            {
+                shared_ptr<Command> cmd = cfg->lookup_command((uintptr_t)data);
+                if (cmd->trigger == Command::TIMEOUT) {
+                    activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
+                }
+            }
+            break;
+        case EVENT_COMMAND_REMOVED:
+            {
+                const RemovedCommandInfo *info = (const RemovedCommandInfo*)data;
+                if (info->trigger == Command::TIMEOUT) {
+                    activity_detector->remove_idle_timeout((gpointer)(long)info->id);
                 }
             }
             break;

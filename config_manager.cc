@@ -11,9 +11,11 @@
 using std::abort;
 using std::char_traits;
 using std::istringstream;
+using std::make_shared;
 using std::make_unique;
-using std::unique_ptr;
+using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using Xidlechain::Command;
 
 static bool read_bool(GKeyFile *key_file, gchar *group, gchar *key, bool &result) {
@@ -49,7 +51,7 @@ static unique_ptr<Command::Action> read_action(GKeyFile *key_file, gchar *group,
 }
 
 namespace Xidlechain {
-    vector<Command>& ConfigManager::list_for(Command::Trigger trigger) {
+    vector<shared_ptr<Command>>& ConfigManager::list_for(Command::Trigger trigger) {
         switch (trigger) {
         case Command::TIMEOUT:
             return timeout_commands;
@@ -63,38 +65,46 @@ namespace Xidlechain {
         }
     }
 
-    void ConfigManager::add_command(Command &&cmd) {
-        list_for(cmd.trigger).emplace_back(std::move(cmd));
+    int ConfigManager::add_command(shared_ptr<Command> cmd) {
+        g_assert(cmd->id == 0);
+        int id = cmd->id = ++command_id_counter;
+        list_for(cmd->trigger).push_back(cmd);
+        id_to_command.emplace(id, std::move(cmd));
+        return id;
     }
 
-    static bool find_command_in_list(vector<Command> &list, const string &name, Command::Trigger trigger, Command **cmd) {
-        for (vector<Command>::iterator it = list.begin(); it != list.end(); it++) {
-            if (it->name == name) {
-                *cmd = &(*it);
-                return true;
-            }
-        }
-        return false;
+    int ConfigManager::add_command(unique_ptr<Command> &&cmd) {
+        return add_command(shared_ptr<Command>(std::move(cmd)));
     }
 
-    bool ConfigManager::find_command(const string &name, Command::Trigger trigger, Command **cmd) {
-        return find_command_in_list(list_for(trigger), name, trigger, cmd);
-    }
-
-    static bool remove_command_from_list(vector<Command> &list, Command &cmd) {
-        for (vector<Command>::iterator it = list.begin(); it != list.end(); it++) {
-            // It's OK to just compare pointers here because once we emplace
-            // a Command into a vector, we never move it out.
-            if (&(*it) == &cmd) {
+    static void remove_command_from_list(vector<shared_ptr<Command>> &list, int cmd_id) {
+        for (vector<shared_ptr<Command>>::iterator it = list.begin(); it != list.end(); it++) {
+            if ((*it)->id == cmd_id) {
                 list.erase(it);
-                return true;
+                return;
             }
         }
-        return false;
+        g_critical("Could not find command to remove");
+        abort();
     }
 
-    bool ConfigManager::remove_command(Command &cmd) {
-        return remove_command_from_list(list_for(cmd.trigger), cmd);
+    bool ConfigManager::remove_command(int cmd_id) {
+        unordered_map<int, shared_ptr<Command>>::iterator it = id_to_command.find(cmd_id);
+        if (it != id_to_command.end()) {
+            return false;
+        }
+        shared_ptr<Command> cmd = it->second;
+        remove_command_from_list(list_for(cmd->trigger), cmd_id);
+        id_to_command.erase(it);
+        return true;
+    }
+
+    shared_ptr<Command> ConfigManager::lookup_command(int cmd_id) {
+        unordered_map<int, shared_ptr<Command>>::iterator it = id_to_command.find(cmd_id);
+        if (it == id_to_command.end()) {
+            return shared_ptr<Command>(nullptr);
+        }
+        return it->second;
     }
 
     bool ConfigManager::set_command_name(Command &cmd, const char *val) {
@@ -149,31 +159,31 @@ namespace Xidlechain {
 
         keys = g_key_file_get_keys(key_file, group, NULL, NULL);
         g_assert_nonnull(keys);
-        Command cmd;
-        set_command_name(cmd, action_name);
+        unique_ptr<Command> cmd = make_unique<Command>();
+        set_command_name(*cmd, action_name);
         for (int i = 0; keys[i] != NULL; i++) {
             gchar *key = keys[i];
             if (g_strcmp0(key, "trigger") == 0) {
                 gchar *val = g_key_file_get_value(key_file, group, key, NULL);
-                if (!set_command_trigger(cmd, val)) {
+                if (!set_command_trigger(*cmd, val)) {
                     return false;
                 }
             } else if (g_strcmp0(key, "exec") == 0) {
-                cmd.activation_action = read_action(key_file, group, key);
-                if (!cmd.activation_action) return false;
+                cmd->activation_action = read_action(key_file, group, key);
+                if (!cmd->activation_action) return false;
             } else if (g_strcmp0(key, "resume_exec") == 0) {
-                cmd.deactivation_action = read_action(key_file, group, key);
-                if (!cmd.deactivation_action) return false;
+                cmd->deactivation_action = read_action(key_file, group, key);
+                if (!cmd->deactivation_action) return false;
             } else {
                 g_warning("Unrecognized key '%s' in section %s", key, group);
                 return false;
             }
         }
-        if (cmd.trigger == Command::NONE) {
+        if (cmd->trigger == Command::NONE) {
             g_warning("Action '%s' must specify a trigger type", action_name);
             return false;
         }
-        if (!cmd.activation_action && !cmd.deactivation_action) {
+        if (!cmd->activation_action && !cmd->deactivation_action) {
             g_warning("Action '%s' must specify either exec or resume_exec", action_name);
             return false;
         }

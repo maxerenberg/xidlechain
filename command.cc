@@ -114,6 +114,7 @@ namespace Xidlechain {
     }
 
     Command::Command():
+        id{0},
         trigger{NONE},
         timeout_ms{0},
         activated{false}

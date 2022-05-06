@@ -15,7 +15,8 @@ namespace Xidlechain {
         EVENT_AUDIO_STOPPED,
         EVENT_CONFIG_CHANGED,
         EVENT_COMMAND_CHANGED,
-        EVENT_COMMAND_DELETED,
+        EVENT_COMMAND_ADDED,
+        EVENT_COMMAND_REMOVED,
     };
 
     class EventReceiver {

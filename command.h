@@ -87,6 +87,7 @@ namespace Xidlechain {
         };
 
         string name;
+        int id;
         Trigger trigger;
         // Only used for TIMEOUT commands
         int64_t timeout_ms;
