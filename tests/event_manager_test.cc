@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <locale>
+#include <memory>
 #include <string>
 #include <vector>
 #include <glib.h>
@@ -12,7 +13,9 @@
 #include "logind_manager.h"
 #include "process_spawner.h"
 
+using std::make_unique;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using namespace Xidlechain;
 
@@ -119,17 +122,17 @@ static bool event_manager_init(EventManager &event_manager) {
                               &brightness_controller);
 }
 
-static Command make_command(
+static unique_ptr<Command> make_command(
     const char *exec,
     const char *resume_exec,
     int64_t timeout_ms,
     Command::Trigger trigger = Command::TIMEOUT
 ) {
-    Command cmd;
-    cmd.trigger = trigger;
-    cmd.activation_action = Command::Action::factory(exec, NULL);
-    cmd.deactivation_action = Command::Action::factory(resume_exec, NULL);
-    cmd.timeout_ms = timeout_ms;
+    unique_ptr<Command> cmd = make_unique<Command>();
+    cmd->trigger = trigger;
+    cmd->activation_action = Command::Action::factory(exec, NULL);
+    cmd->deactivation_action = Command::Action::factory(resume_exec, NULL);
+    cmd->timeout_ms = timeout_ms;
     return cmd;
 }
 
@@ -143,8 +146,8 @@ static void test_activity_1(gpointer, gconstpointer user_data) {
     // It shouldn't matter if the timeouts are passed in non-sorted order
     int64_t timeouts[] = {3000, 2000};
     // add both timeouts
-    config_manager.timeout_commands.emplace_back(make_command(before_cmds[0], after_cmds[0], timeouts[0]));
-    config_manager.timeout_commands.emplace_back(make_command(before_cmds[1], after_cmds[1], timeouts[1]));
+    config_manager.add_command(make_command(before_cmds[0], after_cmds[0], timeouts[0]));
+    config_manager.add_command(make_command(before_cmds[1], after_cmds[1], timeouts[1]));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     g_assert_cmpuint(activity_detector.cb_data.size(), ==, 2);
@@ -178,7 +181,7 @@ static void test_sleep_1(gpointer, gconstpointer user_data) {
     config_manager.ignore_audio = false;
     config_manager.disable_automatic_dpms_activation  = false;
     config_manager.disable_screensaver = false;
-    config_manager.sleep_commands.emplace_back(make_command("s1", "w1", 0, Command::SLEEP));
+    config_manager.add_command(make_command("s1", "w1", 0, Command::SLEEP));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     // send a SLEEP signal
@@ -205,7 +208,7 @@ static void test_audio_1(gpointer, gconstpointer user_data) {
     ConfigManager config_manager;
     config_manager.wait_before_sleep = false;
     config_manager.ignore_audio = (bool)user_data;
-    config_manager.timeout_commands.emplace_back(make_command("b1", "a1", 2000));
+    config_manager.add_command(make_command("b1", "a1", 2000));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
     if (config_manager.ignore_audio) {
@@ -228,7 +231,7 @@ static void test_lock(gpointer, gconstpointer) {
     ConfigManager config_manager;
     config_manager.wait_before_sleep = false;
     config_manager.ignore_audio = false;
-    config_manager.lock_commands.emplace_back(make_command("l1", "u1", 0, Command::LOCK));
+    config_manager.add_command(make_command("l1", "u1", 0, Command::LOCK));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
 

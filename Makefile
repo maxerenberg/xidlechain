@@ -2,7 +2,7 @@ CC = gcc
 CXX = g++
 EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 gudev-1.0 xext libpulse-mainloop-glib
 # don't include all the GLib headers inside the .d files
-CFLAGS = -g -Wall -MMD -iquote ./ \
+CFLAGS = -Wall -MMD -iquote ./ \
 	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
 CXXFLAGS = $(CFLAGS) -std=c++17
 LDLIBS = $(shell pkg-config --libs $(EXT_DEPS))
@@ -55,16 +55,16 @@ uninstall:
 	mandb -u -q
 
 tests/activity_detector_test: tests/activity_detector_test.o activity_detector.o
-	${CXX} -o tests/$@ $^ `pkg-config --libs gdk-x11-3.0 xext`
+	${CXX} -o $@ $^ `pkg-config --libs gdk-x11-3.0 xext`
 
 tests/logind_manager_test: tests/logind_manager_test.o logind_manager.o
-	${CXX} -o tests/$@ $^ `pkg-config --libs gio-unix-2.0`
+	${CXX} -o $@ $^ `pkg-config --libs gio-unix-2.0`
 
 tests/audio_detector_test: tests/audio_detector_test.o audio_detector.o
-	${CXX} -o tests/$@ $^ `pkg-config --libs libpulse libpulse-mainloop-glib`
+	${CXX} -o $@ $^ `pkg-config --libs libpulse libpulse-mainloop-glib`
 
 tests/event_manager_test: tests/event_manager_test.o event_manager.o config_manager.o command.o errors.o
-	${CXX} -o tests/$@ $^ `pkg-config --libs glib-2.0`
+	${CXX} -o $@ $^ `pkg-config --libs glib-2.0`
 
 tests: tests/activity_detector_test tests/logind_manager_test tests/audio_detector_test tests/event_manager_test
 
