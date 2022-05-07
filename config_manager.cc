@@ -239,6 +239,13 @@ namespace Xidlechain {
                 ) {
                     return false;
                 }
+            } else if (g_strcmp0(key, "wake_resumes_activity") == 0) {
+                if (
+                    !read_bool(key_file, group, key, bool_value)
+                    || !set_wake_resumes_activity(bool_value)
+                ) {
+                    return false;
+                }
             } else if (g_strcmp0(key, "enable_dbus") == 0) {
                 if (
                     !read_bool(key_file, group, key, bool_value)
@@ -268,6 +275,10 @@ namespace Xidlechain {
     }
     bool ConfigManager::set_disable_screensaver(bool value) {
         disable_screensaver = value;
+        return true;
+    }
+    bool ConfigManager::set_wake_resumes_activity(bool value) {
+        wake_resumes_activity = value;
         return true;
     }
     bool ConfigManager::set_enable_dbus(bool value) {

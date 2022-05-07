@@ -112,6 +112,12 @@ namespace Xidlechain {
         }
     }
 
+    void EventManager::handle_activity_resumed() {
+        for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
+            deactivate(*cmd);
+        }
+    }
+
     void EventManager::receive(EventType event, gpointer data) {
         switch (event) {
         case EVENT_ACTIVITY_TIMEOUT:
@@ -121,9 +127,7 @@ namespace Xidlechain {
             }
             break;
         case EVENT_ACTIVITY_RESUME:
-            for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
-                deactivate(*cmd);
-            }
+            handle_activity_resumed();
             break;
         case EVENT_SLEEP:
             for (shared_ptr<Command> cmd : cfg->get_sleep_commands()) {
@@ -133,6 +137,9 @@ namespace Xidlechain {
         case EVENT_WAKE:
             for (shared_ptr<Command> cmd : cfg->get_sleep_commands()) {
                 deactivate(*cmd);
+            }
+            if (cfg->wake_resumes_activity) {
+                handle_activity_resumed();
             }
             break;
         case EVENT_LOCK:

@@ -54,6 +54,11 @@ General options are placed under the *[Main]* section:
 	If true, the X11 screensaver extension will be disabled by executing
 	'xset s off' when the program starts. The default value is true.
 
+*wake_resumes_activity* = _true_ or _false_
+	If true, waking from sleep will be considered to be a resumption of
+	activity (i.e. the resume_exec commands for the timeout actions will
+	be run). The default value is true.
+
 *enable_dbus* = _true_ or _false_
 	If true, the settings will be exported over a D-Bus interface at
 	io.github.maxerenberg.xidlechain. The default value is true.
@@ -121,26 +126,29 @@ disable_automatic_dpms_activation = true
 disable_screensaver = true
 
 [Action dim]
+# Dim the screen after 10 minutes, restore the original brightness
+# when activity resumes
 trigger = timeout 600
 exec = builtin:dim
 resume_exec = builtin:undim
 
 [Action turn off monitor]
+# Turn off the monitor after 11 minutes, turn it back on when
+# activity resumes
 trigger = timeout 660
 exec = xset dpms force off
 resume_exec = xset dpms force on
 
 [Action suspend]
+# Suspend the computer after 20 minutes of inactivity
 trigger = timeout 1200
 exec = builtin:suspend
 
-[Action turn on monitor on resume]
-trigger = sleep
-resume_exec = xset dpms force on
-
-[Action restore brightness on resume]
-trigger = sleep
-resume_exec = builtin:undim
+[Action lock]
+# Run custom scripts when the session is locked or unlocked
+trigger = lock
+exec = ~/bin/lock.sh
+resume_exec = ~/bin/unlock.sh
 ```
 
 # ENVIRONMENT VARIABLES

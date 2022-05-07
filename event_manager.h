@@ -34,6 +34,7 @@ namespace Xidlechain {
         void add_timeouts();
         void activate(Command &cmd, bool sync=false);
         void deactivate(Command &cmd, bool sync=false);
+        void handle_activity_resumed();
         void handle_config_ignore_audio_changed(const ConfigChangeInfo *info);
         void handle_command_trigger_changed(const CommandChangeInfo *info);
     public:

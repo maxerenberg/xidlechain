@@ -55,6 +55,9 @@ namespace Xidlechain {
         bool disable_screensaver = true;
         bool set_disable_screensaver(bool value);
 
+        bool wake_resumes_activity = true;
+        bool set_wake_resumes_activity(bool value);
+
         bool enable_dbus = true;
         bool set_enable_dbus(bool value);
 

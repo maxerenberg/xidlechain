@@ -6,6 +6,7 @@
     <property name="WaitBeforeSleep" type="b" access="readwrite"/>
     <property name="DisableAutomaticDPMSActivation" type="b" access="readwrite"/>
     <property name="DisableScreensaver" type="b" access="readwrite"/>
+    <property name="WakeResumesActivity" type="b" access="readwrite"/>
 
     <method name="AddAction">
       <arg direction="in" type="s" name="name"/>
