@@ -2,12 +2,14 @@
 #include <cstdint>
 #include <sys/wait.h>
 #include <unistd.h>
+
 #include "activity_detector.h"
 #include "audio_detector.h"
 #include "brightness_controller.h"
 #include "config_manager.h"
 #include "event_manager.h"
 #include "logind_manager.h"
+#include "map.h"
 #include "process_spawner.h"
 
 using std::uintptr_t;
@@ -61,7 +63,7 @@ namespace Xidlechain {
     }
 
     void EventManager::add_timeouts() {
-        for (shared_ptr<Command> &cmd : cfg->timeout_commands) {
+        for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
             activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
         }
     }
@@ -119,27 +121,27 @@ namespace Xidlechain {
             }
             break;
         case EVENT_ACTIVITY_RESUME:
-            for (shared_ptr<Command> &cmd : cfg->timeout_commands) {
+            for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
                 deactivate(*cmd);
             }
             break;
         case EVENT_SLEEP:
-            for (shared_ptr<Command> &cmd : cfg->sleep_commands) {
+            for (shared_ptr<Command> cmd : cfg->get_sleep_commands()) {
                 activate(*cmd, cfg->wait_before_sleep);
             }
             break;
         case EVENT_WAKE:
-            for (shared_ptr<Command> &cmd : cfg->sleep_commands) {
+            for (shared_ptr<Command> cmd : cfg->get_sleep_commands()) {
                 deactivate(*cmd);
             }
             break;
         case EVENT_LOCK:
-            for (shared_ptr<Command> &cmd : cfg->lock_commands) {
+            for (shared_ptr<Command> cmd : cfg->get_lock_commands()) {
                 activate(*cmd);
             }
             break;
         case EVENT_UNLOCK:
-            for (shared_ptr<Command> &cmd : cfg->lock_commands) {
+            for (shared_ptr<Command> cmd : cfg->get_lock_commands()) {
                 deactivate(*cmd);
             }
             break;
@@ -185,9 +187,10 @@ namespace Xidlechain {
             break;
         case EVENT_COMMAND_ADDED:
             {
-                shared_ptr<Command> cmd = cfg->lookup_command((uintptr_t)data);
+                int id = (uintptr_t)data;
+                shared_ptr<Command> cmd = cfg->lookup_command(id);
                 if (cmd->trigger == Command::TIMEOUT) {
-                    activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
+                    activity_detector->add_idle_timeout(cmd->timeout_ms, data);
                 }
             }
             break;

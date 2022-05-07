@@ -344,9 +344,9 @@ namespace Xidlechain {
         // Export each of the [Action ...] sections as separate objects
         g_autofree gchar *object_manager_path = g_strdup_printf("%s/action", DBUS_OBJECT_BASE_PATH);
         object_manager = g_dbus_object_manager_server_new(object_manager_path);
-        add_actions_to_object_manager(cfg->timeout_commands);
-        add_actions_to_object_manager(cfg->sleep_commands);
-        add_actions_to_object_manager(cfg->lock_commands);
+        for (shared_ptr<Command> cmd : cfg->get_all_commands()) {
+            add_action_to_object_manager(*cmd);
+        }
         g_dbus_object_manager_server_set_connection(object_manager, connection);
 
         // Add handlers for the methods
@@ -415,12 +415,6 @@ namespace Xidlechain {
         g_object_unref(action);
         g_dbus_object_manager_server_export(object_manager, G_DBUS_OBJECT_SKELETON(object));
         g_object_unref(object);
-    }
-
-    void DbusRequestHandler::add_actions_to_object_manager(vector<shared_ptr<Command>> &list) {
-        for (shared_ptr<Command> &cmd : list) {
-            add_action_to_object_manager(*cmd);
-        }
     }
 
     void DbusRequestHandler::init(

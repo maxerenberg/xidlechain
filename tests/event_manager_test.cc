@@ -1,10 +1,14 @@
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <locale>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
 #include <glib.h>
+
 #include "activity_detector.h"
 #include "audio_detector.h"
 #include "brightness_controller.h"
@@ -13,33 +17,42 @@
 #include "logind_manager.h"
 #include "process_spawner.h"
 
+using std::int64_t;
 using std::make_unique;
 using std::string;
 using std::unique_ptr;
+using std::unordered_map;
 using std::vector;
 using namespace Xidlechain;
 
 class MockActivityDetector: public ActivityDetector {
+    unordered_map<int64_t, gpointer> cb_data;
 public:
-    vector<gpointer> cb_data;
     bool init(EventReceiver *receiver) override {
         return true;
     }
     bool add_idle_timeout(int64_t timeout_ms, gpointer data) override {
-        cb_data.push_back(data);
+        cb_data[timeout_ms] = data;
         return true;
     }
     bool remove_idle_timeout(gpointer data) override {
-        vector<gpointer>::iterator it = std::find(cb_data.begin(), cb_data.end(), data);
-        if (it != cb_data.end()) {
-            cb_data.erase(it);
-            return true;
+        for (unordered_map<int64_t, gpointer>::iterator it = cb_data.begin(); it != cb_data.end(); ++it) {
+            if (it->second == data) {
+                cb_data.erase(it);
+                return true;
+            }
         }
         return false;
     }
     bool clear_timeouts() override {
         cb_data.clear();
         return true;
+    }
+    gpointer data_by_timeout(int64_t timeout_ms) {
+        return cb_data.find(timeout_ms)->second;
+    }
+    int num_data() const {
+        return cb_data.size();
     }
     void reset() {
         cb_data.clear();
@@ -150,12 +163,12 @@ static void test_activity_1(gpointer, gconstpointer user_data) {
     config_manager.add_command(make_command(before_cmds[1], after_cmds[1], timeouts[1]));
     EventManager event_manager(&config_manager);
     event_manager_init(event_manager);
-    g_assert_cmpuint(activity_detector.cb_data.size(), ==, 2);
+    g_assert_cmpuint(activity_detector.num_data(), ==, 2);
     // trigger each timeout one at a time
-    event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[1]);
+    event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.data_by_timeout(2000));
     g_assert_cmpuint(process_spawner.async_cmds.size(), ==, 1);
     if (num_timeouts == 2) {
-        event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[0]);
+        event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.data_by_timeout(3000));
         g_assert_cmpuint(process_spawner.async_cmds.size(), ==, 2);
     }
     // verify that the timeouts were executed in order of increasing timeout
@@ -170,8 +183,16 @@ static void test_activity_1(gpointer, gconstpointer user_data) {
     if (num_timeouts == 1) {
         g_assert_cmpstr(process_spawner.async_cmds.at(1), ==, after_cmds[1]);
     } else {
-        g_assert_cmpstr(process_spawner.async_cmds.at(2), ==, after_cmds[0]);
-        g_assert_cmpstr(process_spawner.async_cmds.at(3), ==, after_cmds[1]);
+        // resume_exec callbacks aren't guaranteed to be run in order
+        g_assert(
+            (
+                g_strcmp0(process_spawner.async_cmds.at(2), after_cmds[0]) == 0
+                && g_strcmp0(process_spawner.async_cmds.at(3), after_cmds[1]) == 0
+            ) || (
+                g_strcmp0(process_spawner.async_cmds.at(3), after_cmds[0]) == 0
+                && g_strcmp0(process_spawner.async_cmds.at(2), after_cmds[1]) == 0
+            )
+        );
     }
 }
 
@@ -218,11 +239,11 @@ static void test_audio_1(gpointer, gconstpointer user_data) {
 
     event_manager.receive(EVENT_AUDIO_RUNNING, NULL);
     // timeout should have been cleared
-    g_assert_cmpuint(activity_detector.cb_data.size(), ==, 0);
+    g_assert_cmpuint(activity_detector.num_data(), ==, 0);
     event_manager.receive(EVENT_AUDIO_STOPPED, NULL);
     // timeout should have been restored
-    g_assert_cmpuint(activity_detector.cb_data.size(), ==, 1);
-    event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.cb_data[0]);
+    g_assert_cmpuint(activity_detector.num_data(), ==, 1);
+    event_manager.receive(EVENT_ACTIVITY_TIMEOUT, activity_detector.data_by_timeout(2000));
     // "before" command should have been executed
     g_assert_cmpuint(process_spawner.async_cmds.size(), ==, 1);
 }

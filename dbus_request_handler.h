@@ -106,7 +106,6 @@ namespace Xidlechain {
             const gchar *name,
             gpointer user_data
         );
-        void add_actions_to_object_manager(vector<shared_ptr<Command>> &list);
         void add_action_to_object_manager(Command &cmd);
     public:
         void init(

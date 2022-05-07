@@ -4,22 +4,29 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include <vector>
 
 #include <glib.h>
 
 #include "command.h"
+#include "box_filter.h"
+#include "map.h"
 
 using std::char_traits;
 using std::string;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::unordered_map;
-using std::vector;
 
 namespace Xidlechain {
+    using CommandMapValues =
+        Map<
+            unordered_map<int, shared_ptr<Command>>::iterator,
+            shared_ptr<Command>
+        >;
+    using FilteredCommands = BoxFilter<CommandMapValues>;
+
     class ConfigManager {
-        static constexpr const char *action_prefix = "Action ";
+        static constexpr const char * const action_prefix = "Action ";
         static constexpr const int action_prefix_len = char_traits<char>::length(action_prefix);
 
         unordered_map<int, shared_ptr<Command>> id_to_command;
@@ -27,15 +34,14 @@ namespace Xidlechain {
 
         bool parse_main_section(GKeyFile *key_file, gchar *group);
         bool parse_action_section(GKeyFile *key_file, gchar *group);
-        vector<shared_ptr<Command>>& list_for(Command::Trigger trigger);
+
+        template<Command::Trigger trigger>
+        FilteredCommands get_commands();
     public:
-        // We need to store pointers in the vectors because we actually
-        // store the pointers in other places too, and we can't
-        // keep a pointer to a vector entry's slot (will disappear when
-        // the vector reallocates memory)
-        vector<shared_ptr<Command>> timeout_commands;
-        vector<shared_ptr<Command>> sleep_commands;
-        vector<shared_ptr<Command>> lock_commands;
+        CommandMapValues get_all_commands();
+        FilteredCommands get_timeout_commands();
+        FilteredCommands get_sleep_commands();
+        FilteredCommands get_lock_commands();
 
         bool ignore_audio = false;
         bool set_ignore_audio(bool value);

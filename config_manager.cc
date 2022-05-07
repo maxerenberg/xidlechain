@@ -7,11 +7,12 @@
 #include <utility>
 
 #include "command.h"
+#include "filter.h"
+#include "map.h"
 
 using std::abort;
 using std::char_traits;
 using std::istringstream;
-using std::make_shared;
 using std::make_unique;
 using std::shared_ptr;
 using std::string;
@@ -51,24 +52,46 @@ static unique_ptr<Command::Action> read_action(GKeyFile *key_file, gchar *group,
 }
 
 namespace Xidlechain {
-    vector<shared_ptr<Command>>& ConfigManager::list_for(Command::Trigger trigger) {
-        switch (trigger) {
-        case Command::TIMEOUT:
-            return timeout_commands;
-        case Command::SLEEP:
-            return sleep_commands;
-        case Command::LOCK:
-            return lock_commands;
-        default:
-            g_warning("Unknown command type %d", trigger);
-            abort();
-        }
+    CommandMapValues ConfigManager::get_all_commands() {
+        // For some reason, when I defined this inline in the Map
+        // constructor, it didn't work. I'm still not sure why.
+        std::function<
+            shared_ptr<Command>(std::pair<const int, shared_ptr<Command>>)
+        > f = [](std::pair<const int, shared_ptr<Command>> p) {
+            return p.second;
+        };
+        return Map(
+            id_to_command.begin(),
+            id_to_command.end(),
+            std::move(f)
+        );
+    }
+
+    template<Command::Trigger trigger>
+    FilteredCommands ConfigManager::get_commands() {
+        return BoxFilter(
+            get_all_commands(),
+            [](shared_ptr<Command> cmd){
+                return cmd->trigger == trigger;
+            }
+        );
+    }
+
+    FilteredCommands ConfigManager::get_timeout_commands() {
+        return get_commands<Command::TIMEOUT>();
+    }
+
+    FilteredCommands ConfigManager::get_sleep_commands() {
+        return get_commands<Command::SLEEP>();
+    }
+
+    FilteredCommands ConfigManager::get_lock_commands() {
+        return get_commands<Command::LOCK>();
     }
 
     int ConfigManager::add_command(shared_ptr<Command> cmd) {
         g_assert(cmd->id == 0);
         int id = cmd->id = ++command_id_counter;
-        list_for(cmd->trigger).push_back(cmd);
         id_to_command.emplace(id, std::move(cmd));
         return id;
     }
@@ -77,24 +100,12 @@ namespace Xidlechain {
         return add_command(shared_ptr<Command>(std::move(cmd)));
     }
 
-    static void remove_command_from_list(vector<shared_ptr<Command>> &list, int cmd_id) {
-        for (vector<shared_ptr<Command>>::iterator it = list.begin(); it != list.end(); it++) {
-            if ((*it)->id == cmd_id) {
-                list.erase(it);
-                return;
-            }
-        }
-        g_critical("Could not find command to remove");
-        abort();
-    }
-
     bool ConfigManager::remove_command(int cmd_id) {
         unordered_map<int, shared_ptr<Command>>::iterator it = id_to_command.find(cmd_id);
         if (it != id_to_command.end()) {
             return false;
         }
         shared_ptr<Command> cmd = it->second;
-        remove_command_from_list(list_for(cmd->trigger), cmd_id);
         id_to_command.erase(it);
         return true;
     }
