@@ -35,13 +35,24 @@ namespace Xidlechain {
             } else if (g_strcmp0(cmd_str, "unset_idle_hint") == 0) {
                 return make_unique<Command::UnsetIdleHintAction>();
             } else {
-                if (error) {
-                    *error = g_error_new(XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_ACTION, "Unknown builtin '%s'", cmd_str);
-                }
+                g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_ACTION, "Unknown builtin '%s'", cmd_str);
                 return unique_ptr<Command::Action>(nullptr);
             }
         }
         return make_unique<Command::ShellAction>(cmd_str);
+    }
+
+    bool Command::is_valid(GError **error) const {
+        if (trigger == Command::NONE) {
+            g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_MISSING_TRIGGER, "Action '%s' must specify a trigger type", name.c_str());
+            return false;
+        }
+        if (!activation_action && !deactivation_action) {
+            g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_MISSING_ACTION, "Action '%s' must specify either exec or resume_exec", name.c_str());
+            return false;
+        }
+        return true;
+
     }
 
     Command::ShellAction::ShellAction(const char *cmd_arg): cmd{cmd_arg} {

@@ -28,12 +28,16 @@ namespace Xidlechain {
     class ConfigManager {
         static constexpr const char * const action_prefix = "Action ";
         static constexpr const int action_prefix_len = char_traits<char>::length(action_prefix);
+        static const GKeyFileFlags key_file_flags = G_KEY_FILE_KEEP_COMMENTS;
 
         unordered_map<int, shared_ptr<Command>> id_to_command;
         int command_id_counter = 0;
+        string config_file_path;
 
         bool parse_main_section(GKeyFile *key_file, gchar *group);
         bool parse_action_section(GKeyFile *key_file, gchar *group);
+        void save_config_to_file();
+        static gboolean static_save_config_to_file(gpointer user_data);
 
         template<Command::Trigger trigger>
         FilteredCommands get_commands();
@@ -62,6 +66,7 @@ namespace Xidlechain {
         bool set_enable_dbus(bool value);
 
         bool parse_config_file(const string &filename);
+        void save_config_to_file_async();
         shared_ptr<Command> lookup_command(int cmd_id);
         bool set_command_name(Command &cmd, const char *val);
         bool set_command_trigger(Command &cmd, const char *val);

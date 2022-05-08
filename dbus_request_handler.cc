@@ -148,6 +148,7 @@ namespace Xidlechain {
         g_assert_nonnull(old_value);
         cfg_info.old_value = old_value;
         event_receiver->receive(EVENT_CONFIG_CHANGED, &cfg_info);
+        cfg->save_config_to_file_async();
         return TRUE;
     }
 
@@ -242,6 +243,7 @@ namespace Xidlechain {
         g_assert_nonnull(old_value);
         info.old_value = old_value;
         event_receiver->receive(EVENT_COMMAND_CHANGED, &info);
+        cfg->save_config_to_file_async();
         return TRUE;
     }
 
@@ -268,6 +270,7 @@ namespace Xidlechain {
         const gchar *exec,
         const gchar *resume_exec
     ) {
+        g_autoptr(GError) error = NULL;
         shared_ptr<Command> cmd = make_shared<Command>();
         if (!cfg->set_command_name(*cmd, name)) {
             g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid name");
@@ -285,8 +288,13 @@ namespace Xidlechain {
             g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, "invalid deactivation action");
             return;
         }
+        if (!cmd->is_valid(&error)) {
+            g_dbus_method_invocation_return_dbus_error(invocation, DBUS_ERROR_NAME, error->message);
+            return;
+        }
         int id = cfg->add_command(cmd);
         event_receiver->receive(EVENT_COMMAND_ADDED, (gpointer)(long)id);
+        cfg->save_config_to_file_async();
 
         add_action_to_object_manager(*cmd);
         c_xidlechain_complete_add_action(object, invocation, id);
@@ -317,6 +325,8 @@ namespace Xidlechain {
         cfg->remove_command(id);
         RemovedCommandInfo info = {id, cmd->trigger};
         event_receiver->receive(EVENT_COMMAND_REMOVED, &info);
+        cfg->save_config_to_file_async();
+
         g_autofree gchar *path = g_strdup_printf("%s/action/%d", DBUS_OBJECT_BASE_PATH, id);
         if (!g_dbus_object_manager_server_unexport(object_manager, path)) {
             g_warning("Command %d was not removed", id);

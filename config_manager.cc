@@ -2,8 +2,10 @@
 
 #include <cstdlib>
 #include <memory>
+#include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 #include "command.h"
@@ -13,11 +15,38 @@
 using std::abort;
 using std::char_traits;
 using std::istringstream;
+using std::ofstream;
 using std::make_unique;
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
+using std::unordered_set;
 using Xidlechain::Command;
+
+static string get_xdg_config_home() {
+    char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+    if (xdg_config_home != NULL) {
+        return string(xdg_config_home);
+    }
+    char *home = getenv("HOME");
+    if (home == NULL) {
+        g_warning("HOME environment variable is not set");
+        return string{};
+    }
+    return home + string("/.config");
+}
+
+static string get_default_config_file_path() {
+    string &&xdg_config_home = get_xdg_config_home();
+    if (xdg_config_home.empty()) {
+        return string{};
+    }
+    return xdg_config_home + "/xidlechain.conf";
+}
+
+static const char* bool_to_str(bool val) {
+    return val ? "true" : "false";
+}
 
 static bool read_bool(GKeyFile *key_file, gchar *group, gchar *key, bool &result) {
     g_autoptr(GError) error = NULL;
@@ -101,13 +130,7 @@ namespace Xidlechain {
     }
 
     bool ConfigManager::remove_command(int cmd_id) {
-        unordered_map<int, shared_ptr<Command>>::iterator it = id_to_command.find(cmd_id);
-        if (it != id_to_command.end()) {
-            return false;
-        }
-        shared_ptr<Command> cmd = it->second;
-        id_to_command.erase(it);
-        return true;
+        return id_to_command.erase(cmd_id) == 1;
     }
 
     shared_ptr<Command> ConfigManager::lookup_command(int cmd_id) {
@@ -165,6 +188,7 @@ namespace Xidlechain {
     }
 
     bool ConfigManager::parse_action_section(GKeyFile *key_file, gchar *group) {
+        g_autoptr(GError) error = NULL;
         g_auto(GStrv) keys = NULL;
         gchar *action_name = group + action_prefix_len;
 
@@ -181,21 +205,15 @@ namespace Xidlechain {
                 }
             } else if (g_strcmp0(key, "exec") == 0) {
                 cmd->activation_action = read_action(key_file, group, key);
-                if (!cmd->activation_action) return false;
             } else if (g_strcmp0(key, "resume_exec") == 0) {
                 cmd->deactivation_action = read_action(key_file, group, key);
-                if (!cmd->deactivation_action) return false;
             } else {
                 g_warning("Unrecognized key '%s' in section %s", key, group);
                 return false;
             }
         }
-        if (cmd->trigger == Command::NONE) {
-            g_warning("Action '%s' must specify a trigger type", action_name);
-            return false;
-        }
-        if (!cmd->activation_action && !cmd->deactivation_action) {
-            g_warning("Action '%s' must specify either exec or resume_exec", action_name);
+        if (!cmd->is_valid(&error)) {
+            g_warning(error->message);
             return false;
         }
         add_command(std::move(cmd));
@@ -286,23 +304,104 @@ namespace Xidlechain {
         return true;
     }
 
-    bool ConfigManager::parse_config_file(const string &filename) {
-        static const GKeyFileFlags key_file_flags = G_KEY_FILE_KEEP_COMMENTS;
+    gboolean ConfigManager::static_save_config_to_file(gpointer user_data) {
+        ConfigManager *_this = (ConfigManager*)user_data;
+        _this->save_config_to_file();
+        return FALSE;
+    }
+
+    void ConfigManager::save_config_to_file() {
+        if (config_file_path.empty()) {
+            g_warning("config file path is not set; not saving config");
+            return;
+        }
 
         g_autoptr(GKeyFile) key_file = NULL;
         g_autoptr(GError) error = NULL;
         g_auto(GStrv) groups = NULL;
 
         key_file = g_key_file_new();
-        string config_file_path;
+        if (!g_key_file_load_from_file(key_file, config_file_path.c_str(), key_file_flags, &error)) {
+            if (error->code == G_FILE_ERROR_NOENT) {
+                g_warning("Config file %s does not exist; creating a new file", config_file_path.c_str());
+                g_error_free(error);
+                error = NULL;
+            } else {
+                g_warning("Could not read config file %s: %s", config_file_path.c_str(), error->message);
+                return;
+            }
+        }
+        g_key_file_set_value(key_file, "Main", "ignore_audio", bool_to_str(ignore_audio));
+        g_key_file_set_value(key_file, "Main", "wait_before_sleep", bool_to_str(wait_before_sleep));
+        g_key_file_set_value(key_file, "Main", "disable_automatic_dpms_activation", bool_to_str(disable_automatic_dpms_activation));
+        g_key_file_set_value(key_file, "Main", "disable_screensaver", bool_to_str(disable_screensaver));
+        g_key_file_set_value(key_file, "Main", "wake_resumes_activity", bool_to_str(wake_resumes_activity));
+        g_key_file_set_value(key_file, "Main", "enable_dbus", bool_to_str(enable_dbus));
+
+        unordered_set<string> command_names;
+        for (shared_ptr<Command> cmd : get_all_commands()) {
+            command_names.insert(cmd->name);
+        }
+
+        groups = g_key_file_get_groups(key_file, NULL);
+        for (int i = 0; groups[i] != NULL; i++) {
+            gchar *group = groups[i];
+            if (g_strcmp0(group, "Main") == 0) {
+                continue;
+            } else if (g_str_has_prefix(group, action_prefix)) {
+                string name = string(group + action_prefix_len);
+                if (command_names.find(name) == command_names.end()) {
+                    // command must have been removed via DBus
+                    g_key_file_remove_group(key_file, group, NULL);
+                }
+            } else {
+                g_warning("Unexpected section name '%s'; not saving config", group);
+                return;
+            }
+        }
+
+        for (const shared_ptr<Command> cmd : get_all_commands()) {
+            string group_name = string("Action " + cmd->name);
+            gchar *trigger_str = cmd->get_trigger_str();
+            g_key_file_set_value(key_file, group_name.c_str(), "trigger", trigger_str);
+            g_free(trigger_str);
+            if (cmd->activation_action) {
+                g_key_file_set_value(key_file, group_name.c_str(), "exec", cmd->activation_action->get_cmd_str());
+            } else if (g_key_file_has_key(key_file, group_name.c_str(), "exec", NULL)) {
+                g_key_file_remove_key(key_file, group_name.c_str(), "exec", NULL);
+            }
+            if (cmd->deactivation_action) {
+                g_key_file_set_value(key_file, group_name.c_str(), "resume_exec", cmd->deactivation_action->get_cmd_str());
+            } else if (g_key_file_has_key(key_file, group_name.c_str(), "resume_exec", NULL)) {
+                g_key_file_remove_key(key_file, group_name.c_str(), "resume_exec", NULL);
+            }
+        }
+
+        g_autofree gchar *data = g_key_file_to_data(key_file, NULL, NULL);
+        ofstream output(config_file_path);
+        output << data;
+        if (output.fail()) {
+            g_warning("error saving config to file");
+        }
+        g_debug("saved new config to file");
+    }
+
+    void ConfigManager::save_config_to_file_async() {
+        g_idle_add(static_save_config_to_file, this);
+    }
+
+    bool ConfigManager::parse_config_file(const string &filename) {
+        g_autoptr(GKeyFile) key_file = NULL;
+        g_autoptr(GError) error = NULL;
+        g_auto(GStrv) groups = NULL;
+
+        key_file = g_key_file_new();
         if (filename.empty()) {
-            // TODO: check XDG_CONFIG_HOME
-            char *home = getenv("HOME");
-            if (home == NULL) {
-                g_warning("HOME environment variable must be set");
+            config_file_path = get_default_config_file_path();
+            if (config_file_path.empty()) {
+                g_warning("Could not determine config file path");
                 return false;
             }
-            config_file_path = home + string("/.config/xidlechain.conf");
         } else {
             config_file_path = filename;
         }
@@ -316,16 +415,16 @@ namespace Xidlechain {
         groups = g_key_file_get_groups(key_file, NULL);
         for (int i = 0; groups[i] != NULL; i++) {
             gchar *group = groups[i];
-            if (g_strcmp0(groups[i], "Main") == 0) {
+            if (g_strcmp0(group, "Main") == 0) {
                 if (!parse_main_section(key_file, group)) {
                     return false;
                 }
-            } else if (g_str_has_prefix(groups[i], action_prefix)) {
+            } else if (g_str_has_prefix(group, action_prefix)) {
                 if (!parse_action_section(key_file, group)) {
                     return false;
                 }
             } else {
-                g_warning("Unexpected section name '%s'", groups[i]);
+                g_warning("Unexpected section name '%s'", group);
                 return false;
             }
         }
