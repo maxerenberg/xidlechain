@@ -85,8 +85,7 @@ namespace Xidlechain {
         shared_ptr<Command> cmd;
     };
     struct RemovedCommandInfo {
-        int id;
-        Command::Trigger trigger;
+        shared_ptr<Command> cmd;
     };
 }
 

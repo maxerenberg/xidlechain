@@ -86,6 +86,24 @@ namespace Xidlechain {
             GDBusMethodInvocation *invocation,
             gint id
         );
+        static gboolean static_on_pause(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            gpointer user_data
+        );
+        void on_pause(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation
+        );
+        static gboolean static_on_unpause(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation,
+            gpointer user_data
+        );
+        void on_unpause(
+            _CXidlechain *object,
+            GDBusMethodInvocation *invocation
+        );
 
         static void static_on_bus_acquired(
             GDBusConnection *connection,

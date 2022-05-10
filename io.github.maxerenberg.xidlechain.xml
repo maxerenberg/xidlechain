@@ -8,6 +8,8 @@
     <property name="DisableScreensaver" type="b" access="readwrite"/>
     <property name="WakeResumesActivity" type="b" access="readwrite"/>
 
+    <property name="Paused" type="b" access="read"/>
+
     <method name="AddAction">
       <arg direction="in" type="s" name="name"/>
       <arg direction="in" type="s" name="trigger"/>
@@ -18,6 +20,12 @@
 
     <method name="RemoveAction">
       <arg direction="in" type="i" name="id"/>
+    </method>
+
+    <method name="Pause">
+    </method>
+
+    <method name="Unpause">
     </method>
   </interface>
 </node>

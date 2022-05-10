@@ -17,6 +17,8 @@ using std::uintptr_t;
 namespace Xidlechain {
     EventManager::EventManager(ConfigManager *cfg):
         audio_playing{false},
+        paused{false},
+        timeouts_are_enabled{false},
         activity_detector{NULL},
         cfg{cfg},
         logind_manager{NULL},
@@ -46,7 +48,7 @@ namespace Xidlechain {
         if (cfg->disable_screensaver) {
             process_spawner->exec_cmd_sync("xset s off");
         }
-        add_timeouts();
+        enable_all_timeouts();
         return true;
     }
 
@@ -62,14 +64,47 @@ namespace Xidlechain {
         cmd.deactivate(get_executors(), sync);
     }
 
-    void EventManager::add_timeouts() {
+    void EventManager::enable_timeout_for_new_command(Command &cmd) {
+        g_assert(cmd.trigger == Command::TIMEOUT);
+        if (timeouts_should_be_disabled()) {
+            // cmd will get added later once timeouts are re-enabled
+            g_debug("Not adding '%s' because timeouts are disabled", cmd.name.c_str());
+            return;
+        }
+        activity_detector->add_idle_timeout(cmd.timeout_ms, (gpointer)(long)cmd.id);
+    }
+
+    void EventManager::disable_timeout_for_deleted_command(Command &cmd) {
+        g_assert(cmd.trigger == Command::TIMEOUT);
+        if (!timeouts_are_enabled) {
+            g_debug("Not removing '%s' because timeouts are already disabled", cmd.name.c_str());
+            return;
+        }
+        activity_detector->remove_idle_timeout((gpointer)(long)cmd.id);
+    }
+
+    void EventManager::enable_all_timeouts() {
+        if (timeouts_are_enabled) {
+            g_debug("Timeouts are already enabled");
+            return;
+        }
+        if (timeouts_should_be_disabled()) {
+            g_debug("Timeouts remain disabled");
+            return;
+        }
         for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
             activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
         }
+        timeouts_are_enabled = true;
     }
 
-    void EventManager::clear_timeouts() {
+    void EventManager::disable_all_timeouts() {
+        if (!timeouts_are_enabled) {
+            g_debug("Timeouts are already disabled");
+            return;
+        }
         activity_detector->clear_timeouts();
+        timeouts_are_enabled = false;
     }
 
     void EventManager::handle_config_ignore_audio_changed(const ConfigChangeInfo *info) {
@@ -88,12 +123,12 @@ namespace Xidlechain {
             // NOT IGNORE AUDIO -> IGNORE AUDIO
             // TIMEOUTS DISABLED -> TIMEOUTS ENABLED
             g_debug("Re-enabling timeouts because we are now ignoring audio");
-            add_timeouts();
+            enable_all_timeouts();
         } else {
             // IGNORE AUDIO -> NOT IGNORE AUDIO
             // TIMEOUTS ENABLED -> TIMEOUTS DISABLED
             g_debug("Disabling timeouts because we are no longer ignoring audio");
-            clear_timeouts();
+            disable_all_timeouts();
         }
     }
 
@@ -104,11 +139,15 @@ namespace Xidlechain {
 
         if (old_trigger == Command::Trigger::TIMEOUT) {
             g_debug("Removing old timeout for '%s'", cmd->name.c_str());
-            activity_detector->remove_idle_timeout((gpointer)(long)cmd->id);
+            // Since the trigger changed, the old version of this
+            // command is effectively deleted.
+            disable_timeout_for_deleted_command(*cmd);
         }
         if (new_trigger == Command::Trigger::TIMEOUT) {
             g_debug("Adding new timeout for '%s'", cmd->name.c_str());
-            activity_detector->add_idle_timeout(cmd->timeout_ms, (gpointer)(long)cmd->id);
+            // Since the trigger changed, the new version of this
+            // command is effectively a new command.
+            enable_timeout_for_new_command(*cmd);
         }
     }
 
@@ -116,6 +155,16 @@ namespace Xidlechain {
         for (shared_ptr<Command> cmd : cfg->get_timeout_commands()) {
             deactivate(*cmd);
         }
+    }
+
+    /* Possible transitions:
+     * disabled and should be enabled -> enabled and should be enabled
+     * enabled and should be enabled -> enabled and should be disabled
+     * enabled and should be disabled -> disabled and should be disabled
+     * disabled and should be disabled -> disabled and should be enabled
+     */
+    bool EventManager::timeouts_should_be_disabled() const {
+        return (audio_playing && !cfg->ignore_audio) || paused;
     }
 
     void EventManager::receive(EventType event, gpointer data) {
@@ -161,8 +210,8 @@ namespace Xidlechain {
                 g_debug("Audio running; ignoring");
                 break;
             }
-            g_info("Audio running, disabling timeouts");
-            clear_timeouts();
+            g_debug("Audio running, disabling timeouts");
+            disable_all_timeouts();
             break;
         case EVENT_AUDIO_STOPPED:
             if (!audio_playing) {  // no change
@@ -173,8 +222,8 @@ namespace Xidlechain {
                 g_debug("Audio stopped; ignoring");
                 break;
             }
-            g_info("Audio stopped, re-enabling timeouts");
-            add_timeouts();
+            g_debug("Audio stopped, re-enabling timeouts");
+            enable_all_timeouts();
             break;
         case EVENT_CONFIG_CHANGED:
             {
@@ -197,17 +246,25 @@ namespace Xidlechain {
                 int id = (uintptr_t)data;
                 shared_ptr<Command> cmd = cfg->lookup_command(id);
                 if (cmd->trigger == Command::TIMEOUT) {
-                    activity_detector->add_idle_timeout(cmd->timeout_ms, data);
+                    enable_timeout_for_new_command(*cmd);
                 }
             }
             break;
         case EVENT_COMMAND_REMOVED:
             {
                 const RemovedCommandInfo *info = (const RemovedCommandInfo*)data;
-                if (info->trigger == Command::TIMEOUT) {
-                    activity_detector->remove_idle_timeout((gpointer)(long)info->id);
+                if (info->cmd->trigger == Command::TIMEOUT) {
+                    disable_timeout_for_deleted_command(*info->cmd);
                 }
             }
+            break;
+        case EVENT_PAUSED:
+            paused = true;
+            disable_all_timeouts();
+            break;
+        case EVENT_UNPAUSED:
+            paused = false;
+            enable_all_timeouts();
             break;
         default:
             g_warning("Received unknown event type %d", event);

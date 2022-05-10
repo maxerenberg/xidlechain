@@ -323,7 +323,7 @@ namespace Xidlechain {
             return;
         }
         cfg->remove_command(id);
-        RemovedCommandInfo info = {id, cmd->trigger};
+        RemovedCommandInfo info = {cmd};
         event_receiver->receive(EVENT_COMMAND_REMOVED, &info);
         cfg->save_config_to_file_async();
 
@@ -333,6 +333,47 @@ namespace Xidlechain {
         }
         c_xidlechain_complete_remove_action(object, invocation);
     }
+
+    gboolean DbusRequestHandler::static_on_pause(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        gpointer user_data
+    ) {
+        g_debug("Received request to pause");
+        DbusRequestHandler *_this = (DbusRequestHandler*)user_data;
+        _this->on_pause(object, invocation);
+        return TRUE;
+    }
+
+    void DbusRequestHandler::on_pause(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation
+    ) {
+        event_receiver->receive(EVENT_PAUSED, NULL);
+        c_xidlechain_set_paused(object, TRUE);
+        c_xidlechain_complete_pause(object, invocation);
+    }
+
+    gboolean DbusRequestHandler::static_on_unpause(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation,
+        gpointer user_data
+    ) {
+        g_debug("Received request to unpause");
+        DbusRequestHandler *_this = (DbusRequestHandler*)user_data;
+        _this->on_unpause(object, invocation);
+        return TRUE;
+    }
+
+    void DbusRequestHandler::on_unpause(
+        CXidlechain *object,
+        GDBusMethodInvocation *invocation
+    ) {
+        event_receiver->receive(EVENT_UNPAUSED, NULL);
+        c_xidlechain_set_paused(object, FALSE);
+        c_xidlechain_complete_unpause(object, invocation);
+    }
+
 
     void DbusRequestHandler::on_bus_acquired(
         GDBusConnection *connection,
@@ -374,6 +415,14 @@ namespace Xidlechain {
         g_signal_connect(config_iface,
                          "handle-remove-action",
                          G_CALLBACK(static_on_remove_action),
+                         this);
+        g_signal_connect(config_iface,
+                         "handle-pause",
+                         G_CALLBACK(static_on_pause),
+                         this);
+        g_signal_connect(config_iface,
+                         "handle-unpause",
+                         G_CALLBACK(static_on_unpause),
                          this);
 
         // config_iface doesn't get unref'd (LEAK)

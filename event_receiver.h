@@ -17,6 +17,8 @@ namespace Xidlechain {
         EVENT_COMMAND_CHANGED,
         EVENT_COMMAND_ADDED,
         EVENT_COMMAND_REMOVED,
+        EVENT_PAUSED,
+        EVENT_UNPAUSED,
     };
 
     class EventReceiver {

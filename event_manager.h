@@ -23,6 +23,8 @@ namespace Xidlechain {
 
     class EventManager: public EventReceiver {
         bool audio_playing;
+        bool paused;
+        bool timeouts_are_enabled;
         ActivityDetector *activity_detector;
         ConfigManager *cfg;
         LogindManager *logind_manager;
@@ -30,8 +32,11 @@ namespace Xidlechain {
         BrightnessController *brightness_controller;
 
         Command::ActionExecutors get_executors() const;
-        void clear_timeouts();
-        void add_timeouts();
+        bool timeouts_should_be_disabled() const;
+        void enable_timeout_for_new_command(Command &cmd);
+        void disable_timeout_for_deleted_command(Command &cmd);
+        void disable_all_timeouts();
+        void enable_all_timeouts();
         void activate(Command &cmd, bool sync=false);
         void deactivate(Command &cmd, bool sync=false);
         void handle_activity_resumed();
