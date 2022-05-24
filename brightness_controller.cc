@@ -16,9 +16,9 @@ using std::istringstream;
 using std::strerror;
 using std::timespec;
 
-static const int64_t NANOSEC_PER_SEC = 1000000000;
-static const int64_t MILLISEC_PER_SEC = 1000000;
-static const int NANOSEC_PER_MILLISEC = 1000000;
+static const int64_t NANOSEC_PER_SEC      = 1000000000;
+static const int64_t MILLISEC_PER_SEC     =       1000;
+static const int64_t NANOSEC_PER_MILLISEC =    1000000;
 
 static void add_nanoseconds_to_timespec(const timespec *in_ts, int64_t nanosecs, timespec *out_ts) {
     out_ts->tv_sec = in_ts->tv_sec;
@@ -120,11 +120,12 @@ namespace Xidlechain {
     }
 
     void DbusBrightnessController::dimmer_task_func(GTask *task) {
-        int cur_brightness = original_brightness;
+        g_debug("Starting to dim from brightness = %d", original_brightness);
         // Maybe we should make these configurable?
         const int step_millis = 100;
         const int64_t total_millis = 5000;
         timespec now;
+        // TODO: use dynamic delay to prevent clock drift
         const timespec delay = {
             .tv_sec = 0,
             .tv_nsec = step_millis * NANOSEC_PER_MILLISEC
@@ -135,8 +136,10 @@ namespace Xidlechain {
             g_task_return_pointer(task, NULL, NULL);
             return;
         }
+        timespec start_time = now;
         timespec target_time;
         add_nanoseconds_to_timespec(&now, total_millis * NANOSEC_PER_MILLISEC, &target_time);
+        int cur_brightness = original_brightness;
         // Gradually decrease the brightness until it is 0
         while (timespec_cmp(&now, &target_time) < 0) {
             if (!g_task_set_return_on_cancel(task, FALSE)) {
@@ -147,16 +150,15 @@ namespace Xidlechain {
 
             nanosleep(&delay, NULL);
             clock_gettime(CLOCK_BOOTTIME, &now);
-            int millis_remaining = timespec_diff_in_millis(&target_time, &now);
-            int iterations_remaining = millis_remaining / step_millis;
-            if (iterations_remaining <= 0) break;
-            // next = cur - cur / iterations
-            //      = cur * (iterations - 1) / iterations
-            int next_brightness = (int)((int64_t)cur_brightness * (iterations_remaining - 1) / iterations_remaining);
+            int millis_elapsed = timespec_diff_in_millis(&now, &start_time);
+            if (millis_elapsed >= total_millis) break;
+            // next = (1 - (millis_elapsed / total_millis)) * original_brightness
+            //      = original_brightness - (millis_elapsed * original_brightness) / total_millis
+            int next_brightness = (int)(original_brightness - ((int64_t)millis_elapsed * original_brightness) / total_millis);
             if (next_brightness != cur_brightness) {
                 logind_manager->set_brightness(device_name, (unsigned)next_brightness);
+                cur_brightness = next_brightness;
             }
-            cur_brightness = next_brightness;
 
             g_task_set_return_on_cancel(task, TRUE);
         }
@@ -177,7 +179,7 @@ namespace Xidlechain {
             || dimming_state == CANCELLED
         );
         if (dimming_state == CANCELLED) {
-            g_debug("Restoring original brightness in callback");
+            g_debug("Restoring original brightness in callback to %d", original_brightness);
             logind_manager->set_brightness(g_udev_device_get_name(backlight_device), original_brightness);
             // We're skipping the transition to DIMMED and going straight to NONE
             dimming_state = NONE;
@@ -222,7 +224,7 @@ namespace Xidlechain {
             // Nothing to do
             break;
         case DIMMED:
-            g_debug("Restoring original brightness");
+            g_debug("Restoring original brightness to %d", original_brightness);
             logind_manager->set_brightness(g_udev_device_get_name(backlight_device), original_brightness);
             dimming_state = NONE;
             break;
