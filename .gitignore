@@ -1,8 +1,11 @@
 *.o
 *.d
-xidlechain
-xidlechain.1
-xidlechain*_generated.c
-xidlechain*_generated.h
+/xidlechain
+/xidlechain.1
+/xidlechain*_generated.c
+/xidlechain*_generated.h
 .vscode/
-tests/*_test
+/tests/*_test
+/gui/xidlechain-app
+/gui/resources.c
+/test.conf

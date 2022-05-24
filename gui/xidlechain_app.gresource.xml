@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Adapted from
+    https://gitlab.gnome.org/GNOME/gtk/-/blob/gtk-3-24/examples/application3/exampleapp.gresource.xml
+-->
+<gresources>
+  <gresource prefix="/io/github/maxerenberg/xidlechain/gui">
+    <file preprocess="xml-stripblanks">window.ui</file>
+    <file preprocess="xml-stripblanks">edit_action.ui</file>
+    <file>styles.css</file>
+  </gresource>
+</gresources>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Adapted from
+    https://gitlab.gnome.org/GNOME/gtk/-/blob/gtk-3-24/examples/application10/prefs.ui
+-->
+<interface>
+  <!-- interface-requires gtk+ 3.8 -->
+  <template class="XidlechainAppEditAction" parent="GtkDialog">
+    <property name="title">Edit Action</property>
+    <property name="resizable">True</property>
+    <property name="modal">True</property>
+    <child internal-child="vbox">
+      <object class="GtkBox" id="vbox">
+        <child>
+          <object class="GtkGrid" id="grid">
+            <property name="visible">True</property>
+            <property name="margin">6</property>
+            <property name="row-spacing">12</property>
+            <property name="column-spacing">6</property>
+            <child>
+              <object class="GtkLabel" id="name_label">
+                <property name="visible">True</property>
+                <property name="label">Name:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="name_entry">
+                <property name="visible">True</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="trigger_label">
+                <property name="visible">True</property>
+                <property name="label">Trigger:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkComboBoxText" id="trigger_combobox">
+                <property name="visible">True</property>
+                <items>
+                  <item id="timeout">Timeout</item>
+                  <item id="sleep">Sleep</item>
+                  <item id="lock">Lock</item>
+                </items>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="seconds_label">
+                <property name="visible">True</property>
+                <property name="label">Seconds:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="seconds_entry">
+                <property name="visible">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="activate_label">
+                <property name="visible">True</property>
+                <property name="label">On activate:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="activate_entry">
+                <property name="visible">True</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="deactivate_label">
+                <property name="visible">True</property>
+                <property name="label">On deactivate:</property>
+                <property name="xalign">1</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="deactivate_entry">
+                <property name="visible">True</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">4</property>
+              </packing>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child type="action">
+      <object class="GtkButton" id="button_cancel">
+        <property name="can-default">True</property>
+        <property name="label">Cancel</property>
+        <property name="visible">True</property>
+      </object>
+    </child>
+    <child type="action">
+      <object class="GtkButton" id="button_ok">
+        <property name="label">OK</property>
+        <property name="visible">True</property>
+      </object>
+    </child>
+    <action-widgets>
+      <!--
+        Nicknames can be used for the response values instead of numbers.
+        See https://stackoverflow.com/a/23457919.
+      -->
+      <action-widget response="cancel" default="true">button_cancel</action-widget>
+      <action-widget response="ok">button_ok</action-widget>
+    </action-widgets>
+  </template>
+</interface>

@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <memory>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -14,7 +13,6 @@
 
 using std::abort;
 using std::char_traits;
-using std::istringstream;
 using std::ofstream;
 using std::make_unique;
 using std::shared_ptr;
@@ -56,12 +54,6 @@ static bool read_bool(GKeyFile *key_file, gchar *group, gchar *key, bool &result
         return false;
     }
     return true;
-}
-
-static bool read_int_from_string(const char *s, int &result) {
-    istringstream iss(s);
-    iss >> result;
-    return !iss.fail();
 }
 
 // Returns null iff val is invalid or empty.
@@ -147,27 +139,9 @@ namespace Xidlechain {
     }
 
     bool ConfigManager::set_command_trigger(Command &cmd, const char *val) {
-        static constexpr const char * const timeout_prefix = "timeout ";
-        static constexpr const int timeout_prefix_len = char_traits<char>::length(timeout_prefix);
-
-        if (g_str_has_prefix(val, timeout_prefix)) {
-            int timeout_sec;
-            if (!read_int_from_string(val + timeout_prefix_len, timeout_sec)) {
-                g_warning("Timeout value for action %s must be an integer", cmd.name.c_str());
-                return false;
-            }
-            if (timeout_sec <= 0) {
-                g_warning("Timeout for action %s must be positive", cmd.name.c_str());
-                return false;
-            }
-            cmd.trigger = Command::TIMEOUT;
-            cmd.timeout_ms = (int64_t)timeout_sec * 1000;
-        } else if (g_strcmp0(val, "sleep") == 0) {
-            cmd.trigger = Command::SLEEP;
-        } else if (g_strcmp0(val, "lock") == 0) {
-            cmd.trigger = Command::LOCK;
-        } else {
-            g_warning("Unrecognized trigger type '%s' for action '%s'", val, cmd.name.c_str());
+        g_autoptr(GError) error = NULL;
+        if (!cmd.set_trigger_from_str(val, &error)) {
+            g_warning("Could not set trigger for action %d: %s", cmd.id, error->message);
             return false;
         }
         return true;

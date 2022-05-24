@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <sstream>
 
 #include <glib.h>
 
@@ -10,9 +11,16 @@
 
 using std::abort;
 using std::char_traits;
+using std::istringstream;
 using std::make_unique;
 using std::string;
 using std::unique_ptr;
+
+static bool read_int_from_string(const char *s, int &result) {
+    istringstream iss(s);
+    iss >> result;
+    return !iss.fail();
+}
 
 namespace Xidlechain {
     unique_ptr<Command::Action> Command::Action::factory(const char *cmd_str, GError **error) {
@@ -131,7 +139,7 @@ namespace Xidlechain {
         activated{false}
     {}
 
-    char *Command::get_trigger_str() const {
+    char *Command::static_get_trigger_str(Trigger trigger, int timeout_ms) {
         switch (trigger) {
         case TIMEOUT:
             return g_strdup_printf("timeout %d", (int)(timeout_ms / 1000));
@@ -143,6 +151,37 @@ namespace Xidlechain {
             g_critical("Trigger not set");
             abort();
         }
+    }
+
+    char *Command::get_trigger_str() const {
+        return static_get_trigger_str(trigger, timeout_ms);
+    }
+
+    bool Command::set_trigger_from_str(const char *val, GError **error) {
+        static constexpr const char * const timeout_prefix = "timeout ";
+        static constexpr const int timeout_prefix_len = char_traits<char>::length(timeout_prefix);
+
+        if (g_str_has_prefix(val, timeout_prefix)) {
+            int timeout_sec;
+            if (!read_int_from_string(val + timeout_prefix_len, timeout_sec)) {
+                g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_TRIGGER, "Timeout value must be an integer");
+                return false;
+            }
+            if (timeout_sec <= 0) {
+                g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_TRIGGER, "Timeout must be positive");
+                return false;
+            }
+            trigger = Command::TIMEOUT;
+            timeout_ms = (int64_t)timeout_sec * 1000;
+        } else if (g_strcmp0(val, "sleep") == 0) {
+            trigger = Command::SLEEP;
+        } else if (g_strcmp0(val, "lock") == 0) {
+            trigger = Command::LOCK;
+        } else {
+            g_set_error(error, XIDLECHAIN_ERROR, XIDLECHAIN_ERROR_INVALID_TRIGGER, "Unrecognized trigger type '%s'", val);
+            return false;
+        }
+        return true;
     }
 
     void Command::activate(const Command::ActionExecutors &executors, bool sync) {

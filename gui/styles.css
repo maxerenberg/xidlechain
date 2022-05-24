@@ -1,0 +1,11 @@
+.settings-row {
+  padding: 12px 24px;
+}
+.padded-button {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+#add-action-button {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}

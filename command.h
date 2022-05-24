@@ -98,8 +98,10 @@ namespace Xidlechain {
         void activate(const ActionExecutors &executors, bool sync=false);
         void deactivate(const ActionExecutors &executors, bool sync=false);
         bool is_activated() const;
+        static char *static_get_trigger_str(Trigger trigger, int timeout_ms);
         char *get_trigger_str() const;
         bool is_valid(GError **error) const;
+        bool set_trigger_from_str(const char *val, GError **error);
     private:
         // Only used for TIMEOUT commands
         // We need this because when activity is detected, we need to
