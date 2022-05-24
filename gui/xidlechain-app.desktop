@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Xidlechain Configurator
+Exec=xidlechain-app
+Type=Application
+StartupNotify=true
+Categories=Settings;System;

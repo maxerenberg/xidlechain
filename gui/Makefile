@@ -13,6 +13,7 @@ OBJECTS = main.o xidlechain_app.o xidlechain_app_window.o xidlechain_app_control
 	  xidlechain_app_edit_action.o \
 	  $(addprefix ../,$(PARENT_OBJECTS)) $(AUTOGEN_OBJECTS)
 DEPENDS = ${OBJECTS:.o=.d}
+PREFIX = ~/.local
 
 .PHONY: all autogen clean
 
@@ -25,6 +26,17 @@ $(AUTOGEN_C_FILES): xidlechain_app.gresource.xml window.ui edit_action.ui styles
 	glib-compile-resources $< --target=$@ --sourcedir=. --generate-source
 
 autogen: $(AUTOGEN_C_FILES)
+
+install: xidlechain-app
+	install -D -t $(PREFIX)/bin $<
+	desktop-file-install --dir $(PREFIX)/share/applications $<.desktop
+	@# In case the launcher doesn't have ~/.local/bin in its PATH, use
+	@# the absolute path of the installed program
+	desktop-file-edit --set-key Exec --set-value $(PREFIX)/bin/$< $(PREFIX)/share/applications/$<.desktop
+
+uninstall:
+	rm -f $(PREFIX)/bin/xidlechain-app
+	rm -f $(PREFIX)/share/applications/xidlechain-app.desktop
 
 -include ${DEPENDS}
 

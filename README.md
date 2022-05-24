@@ -31,6 +31,16 @@ Once the dependencies have been installed, run the following:
     make
     make install
 
+### GUI
+
+There is a simple GUI application in the [gui](gui/) folder to make the configuration easier.
+On Debian-based systems, installation requires the `desktop-file-utils` package to be installed.
+After building the server program from the root directory, run the following:
+
+    cd gui
+    make
+    make install
+
 ## Motivation
 
 [xss-lock](https://bitbucket.org/raymonad/xss-lock) and
