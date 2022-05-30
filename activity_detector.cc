@@ -1,6 +1,17 @@
 // Adapted from here:
 // https://chromium.googlesource.com/chromiumos/platform/power_manager/+/refs/heads/0.12.433.B62/xidle.cc
 
+/* TODO:
+ * Create a single alarm with a wait_value of 1ms, and use it to detect when
+ * the user becomes active. Keep track of the timestamp of when the alarm
+ * most recently triggered.
+ * This appears to be the approach used by Mutter, the window manager for
+ * GNOME (see
+ * https://gitlab.gnome.org/GNOME/mutter/-/blob/main/src/backends/x11/meta-backend-x11.c).
+ * This will allow us to "reset" the idle counter when the system wakes
+ * from sleep.
+ */
+
 #include <gdk/gdkx.h>
 #include <glib.h>
 #include <limits>
