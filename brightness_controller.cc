@@ -140,7 +140,19 @@ namespace Xidlechain {
         timespec target_time;
         add_nanoseconds_to_timespec(&now, total_millis * NANOSEC_PER_MILLISEC, &target_time);
         int cur_brightness = original_brightness;
-        // Gradually decrease the brightness until it is 0
+        // On laptops using intel_backlight, the firmware/BIOS will set the
+        // brightness to 100% after resuming from sleep if it was at 0 before
+        // entering sleep. So we don't want to go all the way down to 0.
+        // See https://bbs.archlinux.org/viewtopic.php?id=231909.
+        const int min_brightness =
+            (g_strcmp0(g_udev_device_get_name(backlight_device), "intel_backlight") == 0) ? 1 : 0;
+        if (cur_brightness <= min_brightness) {
+            // Nothing to do
+            g_task_return_pointer(task, NULL, NULL);
+            return;
+        }
+        const int total_delta = cur_brightness - min_brightness;
+        // Gradually decrease the brightness until it is min_brightness
         while (timespec_cmp(&now, &target_time) < 0) {
             if (!g_task_set_return_on_cancel(task, FALSE)) {
                 g_debug("dimmer task got cancelled");
@@ -152,9 +164,9 @@ namespace Xidlechain {
             clock_gettime(CLOCK_BOOTTIME, &now);
             int millis_elapsed = timespec_diff_in_millis(&now, &start_time);
             if (millis_elapsed >= total_millis) break;
-            // next = (1 - (millis_elapsed / total_millis)) * original_brightness
-            //      = original_brightness - (millis_elapsed * original_brightness) / total_millis
-            int next_brightness = (int)(original_brightness - ((int64_t)millis_elapsed * original_brightness) / total_millis);
+            // next = (1 - (millis_elapsed / total_millis)) * total_delta
+            //      = total_delta - (millis_elapsed * total_delta) / total_millis
+            int next_brightness = (int)(total_delta - ((int64_t)millis_elapsed * total_delta) / total_millis);
             if (next_brightness != cur_brightness) {
                 logind_manager->set_brightness(device_name, (unsigned)next_brightness);
                 cur_brightness = next_brightness;
@@ -162,8 +174,8 @@ namespace Xidlechain {
 
             g_task_set_return_on_cancel(task, TRUE);
         }
-        if (cur_brightness != 0) {
-            logind_manager->set_brightness(device_name, 0);
+        if (cur_brightness > min_brightness) {
+            logind_manager->set_brightness(device_name, (unsigned)min_brightness);
         }
         g_task_return_pointer(task, NULL, NULL);
     }
