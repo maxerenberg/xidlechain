@@ -20,11 +20,11 @@ Install dependencies:
 
 On Debian, these can be installed with the following command:
 
-    apt install libgtk-3-dev libgudev-1.0-dev libxext-dev libpulse-dev scdoc g++
+    apt install libgtk-3-dev libgudev-1.0-dev libxext-dev libpulse-dev libsystemd-dev scdoc g++
 
 On Fedora:
 
-    dnf install gtk3-devel libgudev-devel libXext-devel pulseaudio-libs-devel scdoc g++
+    dnf install gtk3-devel libgudev-devel libXext-devel pulseaudio-libs-devel systemd-devel scdoc g++
 
 Once the dependencies have been installed, run the following:
 

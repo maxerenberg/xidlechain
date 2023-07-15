@@ -46,13 +46,13 @@ template<>
 GDBusInterfaceSetPropertyFunc VTableReplacer<CXidlechain>::original_set_property_func = nullptr;
 
 template<>
-GDBusInterfaceVTable VTableReplacer<CXidlechain>::custom_vtable = {0};
+GDBusInterfaceVTable VTableReplacer<CXidlechain>::custom_vtable{};
 
 template<>
 GDBusInterfaceSetPropertyFunc VTableReplacer<CXidlechainAction>::original_set_property_func = nullptr;
 
 template<>
-GDBusInterfaceVTable VTableReplacer<CXidlechainAction>::custom_vtable = {0};
+GDBusInterfaceVTable VTableReplacer<CXidlechainAction>::custom_vtable{};
 
 namespace Xidlechain {
     DbusRequestHandler* DbusRequestHandler::INSTANCE = nullptr;

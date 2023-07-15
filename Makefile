@@ -1,8 +1,8 @@
 CC = gcc
 CXX = g++
-EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 gudev-1.0 xext libpulse-mainloop-glib
+EXT_DEPS = gdk-x11-3.0 gio-unix-2.0 gudev-1.0 xext libpulse-mainloop-glib libsystemd
 # don't include all the GLib headers inside the .d files
-CFLAGS = -Wall -MMD -iquote ./ \
+CFLAGS = -Wall -Wextra -Wno-unused-parameter -MMD -iquote ./ \
 	$(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(EXT_DEPS)))
 CXXFLAGS = $(CFLAGS) -std=c++17
 LDLIBS = $(shell pkg-config --libs $(EXT_DEPS))

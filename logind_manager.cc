@@ -4,6 +4,7 @@
 
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
+#include <systemd/sd-login.h>
 
 #include "app.h"
 #include "defer.h"
@@ -41,49 +42,12 @@ namespace Xidlechain {
             *result = strdup(session_id);
             return true;
         }
-        // Iterate over all sessions and try to find a session for the
-        // current user which has a seat
-        uid_t uid = getuid();
-        gchar *seat_id;
-        guint32 user_id;
-        GError *err = NULL;
-        g_autoptr(GVariant) res = NULL;
-        g_autoptr(GVariant) arr = NULL;
-        GVariant *item = NULL;
-        GVariantIter iter;
-        Defer defer([&]{
-            if (err) {
-                g_warning(err->message);
-                g_error_free(err);
-            }
-        });
-
-        res = g_dbus_proxy_call_sync(
-            manager_proxy, "ListSessions",
-            NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err);
-        if (err) return false;
-        // Take the array out of the tuple
-        g_variant_get(res, "(@a(susso))", &arr);
-        g_variant_iter_init(&iter, arr);
-        bool found = false;
-        while ((item = g_variant_iter_next_value(&iter)) != NULL) {
-            g_assert(g_variant_is_of_type(item, G_VARIANT_TYPE("(susso)")));
-            g_variant_get(item, "(susso)",
-                          &session_id, &user_id, NULL, &seat_id, NULL);
-            if (user_id == uid && seat_id[0] != '\0') {
-                found = true;
-                g_info("Found session ID %s", session_id);
-            }
-            g_free(seat_id);
-            g_variant_unref(item);
-            if (found) {
-                *result = session_id;
-                return true;
-            }
-            g_free(session_id);
+        int sd_ret = sd_uid_get_display(getuid(), result);
+        if (sd_ret < 0) {
+            g_warning("Session ID not found");
+            return false;
         }
-        g_warning("Session ID not found");
-        return false;
+        return true;
     }
 
     bool DbusLogindManager::init(EventReceiver *receiver) {
