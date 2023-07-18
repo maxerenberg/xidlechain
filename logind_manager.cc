@@ -4,7 +4,6 @@
 
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
-#include <systemd/sd-login.h>
 
 #include "app.h"
 #include "defer.h"
@@ -36,16 +35,25 @@ namespace Xidlechain {
         }
     }
 
-    bool DbusLogindManager::get_session_id(char **result) {
+    bool DbusLogindManager::get_session_object_path(char **result) {
         char *session_id = getenv("XDG_SESSION_ID");
         if (session_id && session_id[0] != '\0') {
-            *result = strdup(session_id);
-            return true;
-        }
-        int sd_ret = sd_uid_get_display(getuid(), result);
-        if (sd_ret < 0) {
-            g_warning("Session ID not found");
-            return false;
+            g_autoptr(GError) err = NULL;
+            g_autoptr(GVariant) res = g_dbus_proxy_call_sync(
+                manager_proxy,
+                "GetSession",
+                g_variant_new("(s)", session_id),
+                G_DBUS_CALL_FLAGS_NONE,
+                -1,
+                NULL,
+                &err);
+            if (err) {
+                g_warning(err->message);
+                return false;
+            }
+            g_variant_get(res, "(o)", result);
+        } else {
+            *result = g_strdup("/org/freedesktop/login1/session/auto");
         }
         return true;
     }
@@ -75,19 +83,7 @@ namespace Xidlechain {
         );
         if (err) return false;
 
-        g_autofree gchar *session_id = NULL;
-        if (!get_session_id(&session_id)) return false;
-        g_autoptr(GVariant) res = g_dbus_proxy_call_sync(
-            manager_proxy,
-            "GetSession",
-            g_variant_new("(s)", session_id),
-            G_DBUS_CALL_FLAGS_NONE,
-            -1,
-            NULL,
-            &err
-        );
-        if (err) return false;
-        g_variant_get(res, "(o)", &session_object_path);
+        if (!get_session_object_path(&session_object_path)) return false;
 
         session_proxy = g_dbus_proxy_new_for_bus_sync(
             G_BUS_TYPE_SYSTEM,

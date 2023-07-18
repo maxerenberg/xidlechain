@@ -30,7 +30,7 @@ namespace Xidlechain {
                           * const MANAGER_INTERFACE_NAME,
                           * const SESSION_INTERFACE_NAME;
 
-        bool get_session_id(char **result);
+        bool get_session_object_path(char **result);
         void subscribe_to_lock_and_unlock_signals(const char *session_object_path);
         void subscribe_to_prepare_for_sleep_signal();
         bool acquire_sleep_lock();
